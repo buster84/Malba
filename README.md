@@ -4,14 +4,13 @@ MP API Load Balancer
 
 --------------------
 
-# starting application
-## manager
+## starting application
+### manager
 ```sh
 $ sbt manager/run
 ```
-## worker
+### worker
 ```sh
 $ sbt manager/worker
 ```
-
 

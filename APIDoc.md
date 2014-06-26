@@ -1,7 +1,7 @@
-
 ## API
 # manager
 ## add
+タスクを追加する
 ### request
 ```json
 {
@@ -27,15 +27,16 @@
 ```
 
 ## status
-### req
+追加したタスクの現在の状況を取得する
+### request
 ```json
 {
-　"queue_id": 1234, // malba でのqueue id
+  "queue_id": 1234, // malba でのqueue id
   "id": "XXXX"      // クライアントが指定したID
 }
 ```
 
-### res
+### response
 ```json
 {
   "queue_id": 1234, // malba でのqueue_id
@@ -50,12 +51,19 @@
 ```
 
 ## cancel
-### req
+追加したタスクをキャンセルする
+### request
 ```json
 {
-　"queue_id": 1234, // malba でのqueue id
+  "queue_id": 1234, // malba でのqueue id
   "id": "XXXX"      // クライアントが指定したID
 }
 ```
 
-### res
+### response
+```json
+{
+  "code": 200,      // キャンセル結果のコード 2XX 3XX 4XX 5XX HTTPのコードに準ずる
+  "message": "XXXX" // エラー時のみ
+}
+```

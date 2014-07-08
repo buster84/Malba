@@ -10,7 +10,7 @@
     "from": "XXXX",  // クライアント名 必須
     "id": "XXXXXXX", // クライアントが指定するそれぞれのID クライアント毎にユニーク 必須
     "group": "XXXX", // グループ分け用文字列 任意
-    "type": "MP-API", // タスク種別
+    "type": "MP-API", // タスク種別 必須
     "task": {  // リクエスト先の情報 必須
       "url": "https://selenium-rd.ssreg.shanon-test.jp/services/rest/visitor", // MP APIのURL
       "method": "PUT", // HTTP Method
@@ -29,13 +29,18 @@
 ```json
 {
   "message_type": "add_task_response",
-  "results": {
+  "count": {
+    "from": 0,
+    "to": 1,
+    "total": 1
+  },
+  "results": [ {
     "from": "XXXX",   // リクエスト時に指定されたクライアント名
     "id": "XXXX",     // リクエスト時に指定されたID
     "status": "ack",  // 結果 ack reject
     "codd": 123,      // レスポンスコード
     "message": "XXXX" // rejectされた際のエラーメッセージ
-  }
+  } ]
 }
 ```
 
@@ -46,9 +51,12 @@
 {
   "message_type": "get_status",
   "parameters": {
-    "from": "XXXX", // クライアント名 必須
-    "id": "XXXX",   // クライアントが指定したID
-    "group": "XXXX" // クライアントが指定したグループ id か groupが必須
+    "from": "XXXX",      // クライアント名 必須
+    "id": "XXXX",        // クライアントが指定したID
+    "group": "XXXX",     // クライアントが指定したグループ id か groupが必須
+    "only_count": false, // 件数だけ取得するためのフラグ
+    "offset": N,         // ページング用 offset/limit
+    "limit": NN
   }
 }
 ```
@@ -57,6 +65,11 @@
 ```json
 {
   "message_type": "get_status_response",
+  "count": {
+    "from": 0,
+    "to": 2,
+    "total": 2
+  },
   "results": [
     {
       "from": "XXXX",        // タスク登録時に指定されたクライアント名
@@ -92,7 +105,9 @@
     "from": "XXXX",  // クライアント名 必須
     "id": "XXXX",    // タスク登録時に指定したID
     "group": "XXXX", // タスク登録時に指定したグループ名 IDかグループ名が必須
-    "force": false   // 実行中のpものも強制的にキャンセルするかどうか 
+    "force": false,  // 実行中のpものも強制的にキャンセルするかどうか 
+    "offset": N,     // ページング用 offset/limit
+    "limit": NN
   }
 }
 ```
@@ -101,6 +116,11 @@
 ```json
 {
   "message_type": "cancel_task_response",
+  "count": {
+    "from": 0,
+    "to": 2,
+    "total": 2
+  },
   "results": [
     {
       "from": "XXXX",        // タスク登録時に指定されたクライアント名

@@ -18,9 +18,10 @@ object Dependencies {
   val akkaCluster     = "com.typesafe.akka" %% "akka-cluster" % akkaVer
 
   // Akka persistence 
-  val akkaPersistence     = "com.typesafe.akka"   %% "akka-persistence-experimental" % akkaVer
-  val akkaPersistenceJDBC = "com.github.dnvriend" %% "akka-persistence-jdbc"         % "1.0.0"
-  val postgresJDBC        = "org.postgresql"      % "postgresql"                     % "9.3-1101-jdbc41"
+  val akkaPersistence      = "com.typesafe.akka"   %% "akka-persistence-experimental" % akkaVer
+  val akkaPersistenceMongo = "com.github.ddevore"  %% "akka-persistence-mongo-casbah" % "0.7.3-SNAPSHOT" % "compile"
+  val akkaPersistenceJDBC  = "com.github.dnvriend" %% "akka-persistence-jdbc"         % "1.0.0"
+  val postgresJDBC         = "org.postgresql"      % "postgresql"                     % "9.3-1101-jdbc41"
 
   // For test
   object Test {
@@ -31,7 +32,7 @@ object Dependencies {
   }
 
   val master = Seq(
-    akkaActor, akkaRemote, akkaCluster, akkaContrib, akkaSlfj, akkaPersistence, akkaPersistenceJDBC, postgresJDBC,
+    akkaActor, akkaRemote, akkaCluster, akkaContrib, akkaSlfj, akkaPersistence, akkaPersistenceMongo,
     Test.akkaTestKit, Test.h2JDBC, Test.scalaTest, Test.commonIO
   )
 

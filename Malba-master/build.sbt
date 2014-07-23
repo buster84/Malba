@@ -29,3 +29,7 @@ rpmVendor          := "Shanon"
 rpmUrl             := Some("https://ghe01.shanon.co.jp/Shanon/Malba")
 
 rpmLicense         := Some("""Commercial""")
+
+rpmPost            := Some("""echo "Post install" """)
+
+rpmPreun           := Some("""echo "Pre uninstall" """)

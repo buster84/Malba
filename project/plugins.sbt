@@ -12,6 +12,6 @@ credentials += Credentials(System.getenv("ARTIFACTORY_REALM"), System.getenv("AR
 
 addSbtPlugin("org.scoverage" %% "sbt-scoverage" % "0.99.5.1")
 
-addSbtPlugin("com.typesafe.sbt" % "sbt-native-packager" % "0.7.1")
+addSbtPlugin("com.typesafe.sbt" % "sbt-native-packager" % "0.7.3")
 
 // EclipseKeys.skipParents in ThisBuild := false

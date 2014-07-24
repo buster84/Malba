@@ -53,9 +53,9 @@ start() {
     
     # FIXME figure out how to use daemon correctly
     echo $@ 
-    command="nohup ${RUN_CMD} $@"
+    command="${RUN_CMD} $@"
     echo $command
-    runuser $DAEMON_USER -c "$command"  >> /var/log/malba-master/daemon.log 2>&1 &
+    nohup runuser $DAEMON_USER -c "$command" >> /var/log/malba-master/daemon.log 2>&1 &
 
     # The way to go, but doesn't work properly
   # If the app creates the pid file this gets messy

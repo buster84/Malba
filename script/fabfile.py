@@ -15,7 +15,7 @@ def getenvWithDefault(name, default):
         return default
 
 java_home    = getenv('JAVA_HOME')
-java_opts    = getenv('JAVA_OPTS')
+mem          = getenv('MEM')
 env.user     = getenv('SSH_USER')
 env.password = getenv('SSH_PASSWORD')
 prog         = getenv('SERVICE_NAME')
@@ -44,8 +44,8 @@ def deploy():
         stop()
     update()
     start()
-    if !checkStatus():
-        abort('Can not run %' % (prog))
+    if not checkStatus():
+        abort('Can not run %s' % (prog))
 
 def stop():
     run('service %s stop' % (prog))
@@ -60,32 +60,33 @@ def update():
     run('mkdir -p %s' % (workspace))
     with cd(workspace):
         run('wget %s' % (artifact_url))
-        run('rpm -qa | grep %s || yum install -y ./*rpm' % ( prog ))
-        run('yum update -y ./*rpm')
+        run('yum install -y ./*rpm')
     run('rm -rf %s' % (workspace))
 
 def start():
     time.sleep(60.0)
-    data = {"akka_port"        : akka_port,
+    data = {"app_name"         : prog,
+            "mem"              : mem,
+            "akka_port"        : akka_port,
             "self_ip"          : env.host,
             "application_conf" : "application_" + mode + ".conf",
             "logger_conf"      : "logger_" + mode + ".xml"}
-    with shell_env(JAVA_HOME=java_home, JAVA_OPTS=java_opts, AKKA_PORT=akka_port, SELF_IP=env.host):
-        run('service %(start_script)s start -Dconfig.resource=%(application_conf)s -Dlogger.resource=%(logger_conf)s -DAKKA_PORT=%(akka_port)s -DSELF_IP=%(self_ip)' % (data))
+    with shell_env(JAVA_HOME=java_home, AKKA_PORT=akka_port, SELF_IP=env.host):
+        run('service %(app_name)s start -mem %(mem)s -Dconfig.resource=%(application_conf)s -Dlogback.configurationFile=%(logger_conf)s -DAKKA_PORT=%(akka_port)s -DSELF_IP=%(self_ip)s' % (data))
 
 def restart():
     if checkStatus():
         stop()
     start()
-    if !checkStatus():
-        abort('Can not run %' % (prog))
+    if not checkStatus():
+        abort('Can not run %s' % (prog))
 
 def checkStatus():
-    status = run('service %s status | grep -o running' % (prog))
+    status = run('service %s status | grep -o running || echo "stopped"' % (prog))
     if status == 'running':
-        return true
+        return True
     else:
-        return false
+        return False
 
 # Specifies the name of the user under which to run the command
 def run_as(user, cmd):

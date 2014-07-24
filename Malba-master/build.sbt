@@ -26,10 +26,23 @@ rpmRelease         := Option(System.getenv("BUILD_NUMBER")).getOrElse(new java.u
 
 rpmVendor          := "Shanon"
 
+rpmRequirements    ++= Seq("shadow-utils")
+
 rpmUrl             := Some("https://ghe01.shanon.co.jp/Shanon/Malba")
 
 rpmLicense         := Some("""Commercial""")
 
+rpmPre             := Some(s"""|getent group ${MalbaBuild.GROUPNAME} >/dev/null || groupadd -r ${MalbaBuild.GROUPNAME}
+                               |getent passwd ${MalbaBuild.USERNAME} >/dev/null || \\
+                               |  useradd -r -g ${MalbaBuild.GROUPNAME} -d /home/malba -s /bin/bash \\
+                               |  -c "To start this malba application" ${MalbaBuild.USERNAME}
+                               |mkdir -p /var/log/malba-master && chown ${MalbaBuild.USERNAME}:${MalbaBuild.GROUPNAME} -R /var/log/malba-master
+                               |mkdir -p /mnt/${MalbaBuild.USERNAME} && chown ${MalbaBuild.USERNAME}:${MalbaBuild.GROUPNAME} /mnt/${MalbaBuild.USERNAME}
+                               |exit 0
+                               |""".stripMargin)
+
 rpmPost            := Some("""echo "Post install" """)
 
 rpmPreun           := Some("""echo "Pre uninstall" """)
+
+rpmPostun          := Some("""echo "Post uninstall" """)

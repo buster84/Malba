@@ -46,6 +46,7 @@ def deploy():
     start()
     if not checkStatus():
         abort('Can not run %s' % (prog))
+    time.sleep(60.0)
 
 def stop():
     run('service %s stop' % (prog))
@@ -64,7 +65,6 @@ def update():
     run('rm -rf %s' % (workspace))
 
 def start():
-    time.sleep(60.0)
     data = {"app_name"         : prog,
             "mem"              : mem,
             "akka_port"        : akka_port,
@@ -80,6 +80,7 @@ def restart():
     start()
     if not checkStatus():
         abort('Can not run %s' % (prog))
+    time.sleep(60.0)
 
 def checkStatus():
     status = run('service %s status | grep -o running || echo "stopped"' % (prog))

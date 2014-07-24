@@ -34,7 +34,7 @@ rpmLicense         := Some("""Commercial""")
 
 rpmPre             := Some(s"""|getent group ${MalbaBuild.GROUPNAME} >/dev/null || groupadd -r ${MalbaBuild.GROUPNAME}
                                |getent passwd ${MalbaBuild.USERNAME} >/dev/null || \\
-                               |  useradd -r -g ${MalbaBuild.GROUPNAME} -d /home/malba -s /bin/bash \\
+                               |  useradd -r -g ${MalbaBuild.GROUPNAME} -d /home/malba -s /sbin/nologin \\
                                |  -c "To start this malba application" ${MalbaBuild.USERNAME}
                                |mkdir -p /var/log/malba-master && chown ${MalbaBuild.USERNAME}:${MalbaBuild.GROUPNAME} -R /var/log/malba-master
                                |mkdir -p /mnt/${MalbaBuild.USERNAME} && chown ${MalbaBuild.USERNAME}:${MalbaBuild.GROUPNAME} /mnt/${MalbaBuild.USERNAME}

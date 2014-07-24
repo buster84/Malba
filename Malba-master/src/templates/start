@@ -55,7 +55,7 @@ start() {
     echo $@ 
     command="${RUN_CMD} $@"
     echo $command
-    nohup runuser $DAEMON_USER -c "$command" >> /var/log/malba-master/daemon.log 2>&1 &
+    nohup runuser -s /bin/bash $DAEMON_USER -c "$command" >> /var/log/malba-master/daemon.log 2>&1 &
 
     # The way to go, but doesn't work properly
   # If the app creates the pid file this gets messy

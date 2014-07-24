@@ -25,6 +25,7 @@ object Dependencies {
 
   // Logger
   val logback = "ch.qos.logback" % "logback-classic" % "1.0.13"
+  val mail    = "javax.mail" % "mail" % "1.4"
 
   // For test
   object Test {
@@ -35,12 +36,12 @@ object Dependencies {
   }
 
   val master = Seq(
-    akkaActor, akkaRemote, akkaCluster, akkaContrib, akkaSlfj, akkaPersistence, akkaPersistenceMongo, logback,
+    akkaActor, akkaRemote, akkaCluster, akkaContrib, akkaSlfj, akkaPersistence, akkaPersistenceMongo, logback, mail,
     Test.akkaTestKit, Test.h2JDBC, Test.scalaTest, Test.commonIO
   )
 
   val client = Seq(
-    akkaActor, akkaRemote, akkaSlfj, logback,
+    akkaActor, akkaRemote, akkaSlfj, logback, mail, 
     Test.akkaTestKit, Test.scalaTest, Test.commonIO
   )
 

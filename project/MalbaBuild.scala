@@ -34,7 +34,8 @@ object MalbaBuild extends Build {
     scalaVersion              := Dependencies.Versions.scalaVer,
     resolvers                 := resolversList,
     externalResolvers         := externalResolversList,
-    parallelExecution in Test := false
+    parallelExecution in Test := false,
+    testOptions in Test       += Tests.Argument(TestFrameworks.ScalaTest, "-u", "target/test-reports")
   )
 
   lazy val root = Project(

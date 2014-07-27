@@ -15,6 +15,10 @@ class Frontend extends Actor {
     name = "masterProxy")
 
   def receive = {
+    case AddActorRefAsWorkerRequest ( id, taskType, actor ) =>
+      val request = AddWorkerRequest ( id, taskType, actor.path.toString )
+      self forward request
+
     case AddMeAsWorkerRequest ( id, taskType ) => 
       val request = AddWorkerRequest ( id, taskType, sender().path.toString )
       self forward request

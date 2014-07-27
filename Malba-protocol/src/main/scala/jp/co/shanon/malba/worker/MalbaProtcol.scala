@@ -1,4 +1,5 @@
 package jp.co.shanon.malba.worker
+import akka.actor.ActorRef
 
 object MalbaProtocol {
   //
@@ -6,14 +7,17 @@ object MalbaProtocol {
   //
   case class AddTaskRequest (
     id: String,
+    taskId: String,
     from: String,
     group: Option[String],
+    option: Map[String, String] = Map.empty[String, String],
     taskType: String,
     task: String
   )
 
   case class AddTaskResponse (
     id: String,
+    taskId: String,
     from: String,
     group: Option[String],
     taskType: String,
@@ -122,6 +126,7 @@ object MalbaProtocol {
   case class PutTaskTypeSettingRequest (
     taskType: String,
     maxNrOfWorkers: Int, // TODO: Not sure that it should be implemented later or future.
+    config: Map[String, String] = Map.empty[String, String],
     queueType: String,
     from: String
   )
@@ -135,6 +140,11 @@ object MalbaProtocol {
   //
   // Add worker
   //
+  case class AddActorRefAsWorkerRequest (
+    id: String,
+    taskType: String,
+    actor: ActorRef
+  )
   case class AddMeAsWorkerRequest (
     id: String,
     taskType: String
@@ -154,7 +164,7 @@ object MalbaProtocol {
   //
   // Internal server error 
   //
-  case class IntenalServerError(message: String){
+  case class IntenalServerError(message: String) extends Status {
     val code = "500"
   }
 }

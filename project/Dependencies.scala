@@ -45,5 +45,8 @@ object Dependencies {
     Test.akkaTestKit, Test.scalaTest, Test.commonIO
   )
 
+  val protocol = Seq(
+    "com.typesafe.akka" %% "akka-actor"   % "2.2.4"
+  )
 
 }

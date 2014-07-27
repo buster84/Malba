@@ -1,8 +1,7 @@
 import malba.{ Dependencies, MalbaBuild, Publish }
 
-libraryDependencies ++= Dependencies.protocol
-
-
 MalbaBuild.buildSettings
+
+libraryDependencies ++= Dependencies.client
 
 Publish.settings

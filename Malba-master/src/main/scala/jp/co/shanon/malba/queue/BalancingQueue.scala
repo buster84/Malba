@@ -2,14 +2,20 @@ package jp.co.shanon.malba.queue
 import jp.co.shanon.malba.worker.Task
 import scala.collection.mutable.LinkedHashMap
 
-class BalancingQueue extends CustomQueue {
+class BalancingQueue( config: Map[String, String] = Map.empty[String, String] ) extends CustomQueue( config ) {
   private var storage: Seq[(String,LinkedHashMap[String, Task])] = Seq.empty[(String,LinkedHashMap[String, Task])]
 
   def isEmpty: Boolean = {
     storage.isEmpty
   }
 
-  def enqueue( task: Task, group: Option[String] ): Unit = {
+  def contains(id: String): Boolean = {
+    storage.exists{
+      case ( _, list) => list.isDefinedAt(id)
+    }
+  }
+
+  def enqueue( task: Task, group: Option[String], option: Map[String, String] ): Unit = {
     val insertingGroup = group.getOrElse( "OTHERS" )
     if(storage.exists{ case (g, _) => g == insertingGroup }){
       storage = storage.collect {

@@ -34,8 +34,7 @@ object MalbaBuild extends Build {
     scalaVersion              := Dependencies.Versions.scalaVer,
     resolvers                 := resolversList,
     externalResolvers         := externalResolversList,
-    parallelExecution in Test := false,
-    testOptions in Test       += Tests.Argument(TestFrameworks.ScalaTest, "-u", "target/test-reports")
+    parallelExecution in Test := false
   )
 
   lazy val root = Project(
@@ -57,7 +56,7 @@ object MalbaBuild extends Build {
   )
 
   lazy val client = Project(
-    id           = "malba-master",
+    id           = "malba-client",
     base         = file("Malba-client"),
     dependencies = Seq(protocol)
   )

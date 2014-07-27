@@ -1,8 +1,9 @@
 package jp.co.shanon.malba.queue
 import jp.co.shanon.malba.worker.Task
 
-trait CustomQueue extends scala.Serializable {
-  def enqueue( task: Task, group: Option[String] ): Unit
+abstract class CustomQueue( config: Map[String, String] ) extends scala.Serializable {
+  def contains(id: String): Boolean
+  def enqueue( task: Task, group: Option[String], option: Map[String, String] ): Unit
   def isEmpty: Boolean
   def dequeue(): Task
   def deleteById( id: String ): Unit

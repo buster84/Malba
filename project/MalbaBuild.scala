@@ -41,7 +41,7 @@ object MalbaBuild extends Build {
     id        = "malba",
     base      = file("."),
     settings  = buildSettings,
-    aggregate = Seq(master, protocol, client)
+    aggregate = Seq(master, protocol, client, clientPlayPlugin)
   )
 
   lazy val protocol = Project(
@@ -59,5 +59,11 @@ object MalbaBuild extends Build {
     id           = "malba-client",
     base         = file("Malba-client"),
     dependencies = Seq(protocol)
+  )
+
+  lazy val clientPlayPlugin = Project(
+    id           = "malba-client-playPlugin",
+    base         = file("Malba-client-playPlugin"),
+    dependencies = Seq(client)
   )
 }

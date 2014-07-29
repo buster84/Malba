@@ -49,4 +49,10 @@ object Dependencies {
     "com.typesafe.akka" %% "akka-actor"   % "2.2.4"
   )
 
+  val clientPlayPlugin = Seq(
+    "com.typesafe.play" %% "play" % "2.3.0" % "provided" cross CrossVersion.binary,
+    "com.typesafe.play" %% "play-test" % "2.3.0" % "test" cross CrossVersion.binary,
+    "org.specs2" % "specs2" % "2.3.12" % "test" cross CrossVersion.binary
+  )
+
 }

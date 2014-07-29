@@ -30,7 +30,6 @@ class MalbaRequestHandler(router: ActorRef, timeout: FiniteDuration, maxRetry: I
       log.warning(s"No response from Malba, retrying ${tryCount.toString} times.")
       context.become(waitForResponse(from, request, tryCount + 1))
       router ! request
-      context.stop( self )
 
     case ReceiveTimeout =>
       log.error(s"Timeout after tyring ${tryCount.toString} times.")

@@ -37,6 +37,20 @@ class MalbaClient(system: ActorSystem, from: String, timeout: FiniteDuration, ma
     }
   }
 
+  def getTask(taskType: String): Future[MalbaProtocol.GetTaskResponseBase] = {
+    val getTaskRequest = MalbaProtocol.GetTaskRequest (
+      id       = makeRequestId,
+      from     = from,
+      taskType = taskType
+    )
+    (system.actorOf(Props( classOf[MalbaRequestHandler], router, timeout, maxRetry )) ask getTaskRequest).map {
+      case NoResponse =>
+        throw new Exception("Can't get response")
+      case res: MalbaProtocol.GetTaskResponseBase =>
+        res
+    }
+  }
+
   def addWorker( taskType: String, actor: ActorRef ): Future[MalbaProtocol.Status] = {
     val request = MalbaProtocol.AddActorRefAsWorkerRequest (
       id = makeRequestId,

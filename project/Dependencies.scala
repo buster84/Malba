@@ -24,8 +24,12 @@ object Dependencies {
   val postgresJDBC         = "org.postgresql"      % "postgresql"                     % "9.3-1101-jdbc41"
 
   // Logger
-  val logback = "ch.qos.logback" % "logback-classic" % "1.0.13"
-  val mail    = "javax.mail" % "mail" % "1.4"
+  val logback  = "ch.qos.logback" % "logback-classic" % "1.0.13"
+  val mail     = "javax.mail" % "mail" % "1.4"
+
+  // joda time
+  val jodatime    = "joda-time" % "joda-time" % "2.3"
+  val jodaconvert = "org.joda" % "joda-convert" % "1.2"
 
   // For test
   object Test {
@@ -41,7 +45,7 @@ object Dependencies {
   )
 
   val client = Seq(
-    akkaActor, akkaRemote, akkaSlfj, logback, mail, 
+    akkaActor, akkaRemote, akkaSlfj, logback, mail, jodatime, jodaconvert,
     Test.akkaTestKit, Test.scalaTest, Test.commonIO
   )
 

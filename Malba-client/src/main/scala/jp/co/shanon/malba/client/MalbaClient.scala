@@ -11,7 +11,7 @@ import akka.actor.Props
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class MalbaClient(system: ActorSystem, from: String, timeout: FiniteDuration, maxRetry: Int) {
-  val router = system.actorOf( FromConfig.props(), "malbarouter1")
+  val router = system.actorOf( FromConfig().props(), "malbarouter1")
   implicit val askTimeout = akka.util.Timeout(timeout * (maxRetry + 3))
 
   def makeRequestId: String = {

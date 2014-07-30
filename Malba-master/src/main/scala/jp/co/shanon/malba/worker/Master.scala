@@ -32,9 +32,9 @@ class Master(workManagerId: String) extends PersistentActor with ActorLogging {
     Deadline.now + deleteAfter
   }
 
-  var commandIds: Map[String, Deadline] = Map.empty[String, Deadline]
-
-  var commandIdForGetTask: Map[String, (MalbaProtocol.GetTaskResponseBase, Deadline)] = Map.empty[String, (MalbaProtocol.GetTaskResponseBase, Deadline)]
+  var commandIdForAddTask: Map[String, (MalbaProtocol.AddTaskResponse, Deadline)]       = Map.empty[String, (MalbaProtocol.AddTaskResponse, Deadline)]
+  var commandIdForGetTask: Map[String, (MalbaProtocol.GetTaskResponseBase, Deadline)]   = Map.empty[String, (MalbaProtocol.GetTaskResponseBase, Deadline)]
+  var commandIdForCancelTask: Map[String, (MalbaProtocol.CancelTaskResponse, Deadline)] = Map.empty[String, (MalbaProtocol.CancelTaskResponse, Deadline)]
 
   val cleanupTask = context.system.scheduler.schedule(deleteAfter, deleteAfter, self, CleanupTick)
   override def postStop(): Unit = {
@@ -90,17 +90,24 @@ class Master(workManagerId: String) extends PersistentActor with ActorLogging {
     case message @ MalbaProtocol.AddWorkerRequest( id, taskType, actorPath ) =>
       workerManager forward message
 
-    case MalbaProtocol.AddTaskRequest ( id, from, group, taskType, task ) =>
-      if(commandIds.isDefinedAt(id)){
-        sender() ! MalbaProtocol.AddTaskResponse ( id, from, group, taskType, MalbaProtocol.Ok, 0L, 0L, 0L ) // TODO: Implement seq number
+    case MalbaProtocol.AddTaskRequest ( id, taskId, from, group, option, taskType, task ) =>
+      if(commandIdForAddTask.isDefinedAt(id)){
+        val response: MalbaProtocol.AddTaskResponse = commandIdForAddTask.apply( id )._1
+        sender() ! response
       } else {
-        commandIds = commandIds + (id -> getDeadline)
-
-        val event = MasterState.TaskAdded(id, from, group, taskType, task)
-        persist(event) { evt =>
-          addTask(evt)
-          sender() ! MalbaProtocol.AddTaskResponse ( evt.id, evt.from, evt.group, evt.taskType, MalbaProtocol.Ok, 0L, 0L, 0L ) // TODO: Implement seq number
-          workerManager ! MasterProtocol.Notify(evt.taskType)
+        if(masterState.contains(taskType, taskId)){
+          val response = MalbaProtocol.AddTaskResponse(id, taskId, from, group, taskType, MalbaProtocol.Reject("409", "Duplicate task id"), 0L, 0L, 0L)
+          commandIdForAddTask = commandIdForAddTask + (id -> Tuple2(response, getDeadline))
+          sender() ! response
+        } else {
+          val event    = MasterState.TaskAdded(id, from, taskId, group, option, taskType, task)
+          val response = MalbaProtocol.AddTaskResponse ( id, from, taskId,  group, taskType, MalbaProtocol.Ok, 0L, 0L, 0L ) // TODO: Implement seq number
+          commandIdForAddTask = commandIdForAddTask + (id -> Tuple2(response, getDeadline))
+          persist(event) { evt =>
+            addTask(evt)
+            sender() ! response
+            workerManager ! MasterProtocol.Notify(evt.taskType)
+          }
         }
       }
 
@@ -125,40 +132,54 @@ class Master(workManagerId: String) extends PersistentActor with ActorLogging {
       }
 
     case MalbaProtocol.CancelTaskByIdRequest ( id, from, taskType, taskId )   =>
-      if(commandIds.isDefinedAt(id)){
-        sender() ! MalbaProtocol.CancelTaskByIdResponse ( id, from, taskType, taskId, MalbaProtocol.Ok )
+      if(commandIdForCancelTask.isDefinedAt(id)){
+        val response: MalbaProtocol.CancelTaskResponse = commandIdForCancelTask.apply( id )._1
+        sender() ! response
       } else {
-        commandIds = commandIds + (id -> getDeadline)
-        val event = MasterState.TaskCanceledById(id, from, taskType, taskId)
-        persist(event) { evt =>
-          cancelTaskById(evt)
-          sender() ! MalbaProtocol.CancelTaskByIdResponse ( evt.id, evt.from, evt.taskType, evt.taskId, MalbaProtocol.Ok )
+        if(!masterState.contains(taskType, taskId)){
+          val response = MalbaProtocol.CancelTaskByIdResponse(id, from, taskType, taskId, MalbaProtocol.Reject("404", "Not found task id"))
+          commandIdForCancelTask = commandIdForCancelTask + (id -> Tuple2(response, getDeadline))
+          sender() ! response
+        } else {
+          val event    = MasterState.TaskCanceledById(id, from, taskType, taskId)
+          val response = MalbaProtocol.CancelTaskByIdResponse ( id, from, taskType, taskId, MalbaProtocol.Ok )
+          commandIdForCancelTask = commandIdForCancelTask + (id -> Tuple2(response, getDeadline))
+          persist(event) { evt =>
+            cancelTaskById(evt)
+            sender() ! response
+          }
         }
       }
 
     case MalbaProtocol.CancelTaskByGroupRequest ( id, from, taskType, group ) =>
-      if(commandIds.isDefinedAt(id)){
-        sender() ! MalbaProtocol.CancelTaskByGroupResponse ( id, from, taskType, group, MalbaProtocol.Ok )
+      if(commandIdForCancelTask.isDefinedAt(id)){
+        val response: MalbaProtocol.CancelTaskResponse = commandIdForCancelTask.apply( id )._1
+        sender() ! response
       } else {
-        commandIds = commandIds + (id -> getDeadline)
-        val event = MasterState.TaskCanceledByGroup(id, from, taskType, group)
+        val event    = MasterState.TaskCanceledByGroup(id, from, taskType, group)
+        val response = MalbaProtocol.CancelTaskByGroupResponse ( id, from, taskType, group, MalbaProtocol.Ok )
+        commandIdForCancelTask = commandIdForCancelTask + (id -> Tuple2(response, getDeadline))
         persist(event) { evt =>
           cancelTaskByGroup(evt)
-          sender() ! MalbaProtocol.CancelTaskByGroupResponse ( evt.id, evt.from, evt.taskType, evt.group, MalbaProtocol.Ok )
+          sender() ! response
         }
       }
-    case MalbaProtocol.PutTaskTypeSettingRequest ( taskType, maxNrOfWorkers, queueType, from ) =>
-      val event = MasterState.TaskTypeSettingAdded(from, taskType, queueType, maxNrOfWorkers)
+
+    case MalbaProtocol.PutTaskTypeSettingRequest ( taskType, maxNrOfWorkers, config, queueType, from ) =>
+      val event = MasterState.TaskTypeSettingAdded(from, taskType, queueType, maxNrOfWorkers, config)
       persist(event) { evt =>
         setTaskTypeSetting( evt )
         sender() ! MalbaProtocol.PutTaskTypeSettingResponse ( evt.from, evt.taskType, MalbaProtocol.Ok )
       }
 
     case CleanupTick =>
-      commandIds = commandIds.filterNot {
-        case (_, deadline) => deadline.isOverdue
+      commandIdForAddTask = commandIdForAddTask.filterNot {
+        case (_, (_, deadline)) => deadline.isOverdue
       }
       commandIdForGetTask = commandIdForGetTask.filterNot {
+        case (_, (_, deadline)) => deadline.isOverdue
+      }
+      commandIdForCancelTask = commandIdForCancelTask.filterNot {
         case (_, (_, deadline)) => deadline.isOverdue
       }
   }

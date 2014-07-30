@@ -139,15 +139,15 @@ class MasterSpec(var _system: ActorSystem)
     // Add task
     within(15.seconds) {
       awaitAssert {
-        frontend ! MalbaProtocol.AddTaskRequest ( "id1", "from1", None, "taskType1", "contents1")
-        expectMsg(MalbaProtocol.AddTaskResponse ( "id1", "from1", None, "taskType1", MalbaProtocol.Ok, 0L, 0L, 0L))
-        frontend ! MalbaProtocol.AddTaskRequest ( "id1", "from1", None, "taskType1", "contents1")
-        expectMsg(MalbaProtocol.AddTaskResponse ( "id1", "from1", None, "taskType1", MalbaProtocol.Ok, 0L, 0L, 0L))
-        frontend ! MalbaProtocol.AddTaskRequest ( "id2", "from1", None, "taskType1", "contents2")
-        expectMsg(MalbaProtocol.AddTaskResponse ( "id2", "from1", None, "taskType1", MalbaProtocol.Ok, 0L, 0L, 0L))
+        frontend ! MalbaProtocol.AddTaskRequest ( "id1","id1", "from1", None, Map.empty[String, String], "taskType1", "contents1")
+        expectMsg(MalbaProtocol.AddTaskResponse ( "id1", "from1", "id1",None, "taskType1", MalbaProtocol.Ok, 0L, 0L, 0L))
+        frontend ! MalbaProtocol.AddTaskRequest ( "id1","id1", "from1", None, Map.empty[String, String], "taskType1", "contents1")
+        expectMsg(MalbaProtocol.AddTaskResponse ( "id1", "from1", "id1",None, "taskType1", MalbaProtocol.Ok, 0L, 0L, 0L))
+        frontend ! MalbaProtocol.AddTaskRequest ( "id2","id2", "from1", None, Map.empty[String, String], "taskType1", "contents2")
+        expectMsg(MalbaProtocol.AddTaskResponse ( "id2", "from1", "id2",None, "taskType1", MalbaProtocol.Ok, 0L, 0L, 0L))
 
-        frontend ! MalbaProtocol.AddTaskRequest ( "id3", "from1", None, "taskType2", "contents3")
-        expectMsg(MalbaProtocol.AddTaskResponse ( "id3", "from1", None, "taskType2", MalbaProtocol.Ok, 0L, 0L, 0L))
+        frontend ! MalbaProtocol.AddTaskRequest ( "id3","id3", "from1", None, Map.empty[String, String], "taskType2", "contents3")
+        expectMsg(MalbaProtocol.AddTaskResponse ( "id3", "from1", "id3",None, "taskType2", MalbaProtocol.Ok, 0L, 0L, 0L))
       }
     }
 
@@ -170,12 +170,12 @@ class MasterSpec(var _system: ActorSystem)
 
 
     // Cancel by id
-    frontend ! MalbaProtocol.AddTaskRequest ( "id9", "from1", None, "taskType1", "contents9")
-    expectMsg(MalbaProtocol.AddTaskResponse ( "id9", "from1", None, "taskType1", MalbaProtocol.Ok, 0L, 0L, 0L))
-    frontend ! MalbaProtocol.AddTaskRequest ( "id10", "from1", None, "taskType1", "contents10")
-    expectMsg(MalbaProtocol.AddTaskResponse ( "id10", "from1", None, "taskType1", MalbaProtocol.Ok, 0L, 0L, 0L))
-    frontend ! MalbaProtocol.AddTaskRequest ( "id11", "from1", None, "taskType1", "contents11")
-    expectMsg(MalbaProtocol.AddTaskResponse ( "id11", "from1", None, "taskType1", MalbaProtocol.Ok, 0L, 0L, 0L))
+    frontend ! MalbaProtocol.AddTaskRequest ( "id9", "id9", "from1", None, Map.empty[String, String], "taskType1", "contents9")
+    expectMsg(MalbaProtocol.AddTaskResponse ( "id9", "from1", "id9", None, "taskType1", MalbaProtocol.Ok, 0L, 0L, 0L))
+    frontend ! MalbaProtocol.AddTaskRequest ( "id10","id10", "from1", None, Map.empty[String, String], "taskType1", "contents10")
+    expectMsg(MalbaProtocol.AddTaskResponse ( "id10", "from1","id10", None, "taskType1", MalbaProtocol.Ok, 0L, 0L, 0L))
+    frontend ! MalbaProtocol.AddTaskRequest ( "id11","id11", "from1", None, Map.empty[String, String], "taskType1", "contents11")
+    expectMsg(MalbaProtocol.AddTaskResponse ( "id11", "from1", "id11",None, "taskType1", MalbaProtocol.Ok, 0L, 0L, 0L))
 
     frontend ! MalbaProtocol.CancelTaskByIdRequest ( "id12", "from1", "taskType1", "id10" )
     expectMsg(MalbaProtocol.CancelTaskByIdResponse ( "id12", "from1", "taskType1", "id10", MalbaProtocol.Ok ))
@@ -189,12 +189,12 @@ class MasterSpec(var _system: ActorSystem)
 
 
     // Cancel by group
-    frontend ! MalbaProtocol.AddTaskRequest ( "id15", "from1", Some( "group1" ), "taskType1", "contents15")
-    expectMsg(MalbaProtocol.AddTaskResponse ( "id15", "from1", Some( "group1" ), "taskType1", MalbaProtocol.Ok, 0L, 0L, 0L))
-    frontend ! MalbaProtocol.AddTaskRequest ( "id16", "from1", Some( "group1" ), "taskType1", "contents16")
-    expectMsg(MalbaProtocol.AddTaskResponse ( "id16", "from1", Some( "group1" ), "taskType1", MalbaProtocol.Ok, 0L, 0L, 0L))
-    frontend ! MalbaProtocol.AddTaskRequest ( "id17", "from1", Some( "group1" ), "taskType1", "contents17")
-    expectMsg(MalbaProtocol.AddTaskResponse ( "id17", "from1", Some( "group1" ), "taskType1", MalbaProtocol.Ok, 0L, 0L, 0L))
+    frontend ! MalbaProtocol.AddTaskRequest ( "id15","id15", "from1", Some( "group1" ), Map.empty[String, String], "taskType1", "contents15")
+    expectMsg(MalbaProtocol.AddTaskResponse ( "id15", "from1","id15", Some( "group1" ), "taskType1", MalbaProtocol.Ok, 0L, 0L, 0L))
+    frontend ! MalbaProtocol.AddTaskRequest ( "id16","id16", "from1", Some( "group1" ), Map.empty[String, String], "taskType1", "contents16")
+    expectMsg(MalbaProtocol.AddTaskResponse ( "id16", "from1","id16", Some( "group1" ), "taskType1", MalbaProtocol.Ok, 0L, 0L, 0L))
+    frontend ! MalbaProtocol.AddTaskRequest ( "id17","id17", "from1", Some( "group1" ), Map.empty[String, String], "taskType1", "contents17")
+    expectMsg(MalbaProtocol.AddTaskResponse ( "id17", "from1","id17", Some( "group1" ), "taskType1", MalbaProtocol.Ok, 0L, 0L, 0L))
 
     frontend ! MalbaProtocol.CancelTaskByGroupRequest ( "id18", "from1", "taskType1", "group1" )
     expectMsg(MalbaProtocol.CancelTaskByGroupResponse ( "id18", "from1", "taskType1", "group1", MalbaProtocol.Ok ))
@@ -203,12 +203,12 @@ class MasterSpec(var _system: ActorSystem)
     expectMsg(MalbaProtocol.GetNoTaskResponse ( "id19", "from1", "taskType1"))
 
     // Check persistence
-    frontend ! MalbaProtocol.AddTaskRequest ( "id20", "from1", Some( "group1" ), "taskType1", "contents20")
-    expectMsg(MalbaProtocol.AddTaskResponse ( "id20", "from1", Some( "group1" ), "taskType1", MalbaProtocol.Ok, 0L, 0L, 0L))
-    frontend ! MalbaProtocol.AddTaskRequest ( "id21", "from1", Some( "group1" ), "taskType1", "contents21")
-    expectMsg(MalbaProtocol.AddTaskResponse ( "id21", "from1", Some( "group1" ), "taskType1", MalbaProtocol.Ok, 0L, 0L, 0L))
-    frontend ! MalbaProtocol.AddTaskRequest ( "id22", "from1", Some( "group1" ), "taskType1", "contents22")
-    expectMsg(MalbaProtocol.AddTaskResponse ( "id22", "from1", Some( "group1" ), "taskType1", MalbaProtocol.Ok, 0L, 0L, 0L))
+    frontend ! MalbaProtocol.AddTaskRequest ( "id20", "id20", "from1", Some( "group1" ), Map.empty[String, String], "taskType1", "contents20")
+    expectMsg(MalbaProtocol.AddTaskResponse ( "id20", "from1", "id20", Some( "group1" ), "taskType1", MalbaProtocol.Ok, 0L, 0L, 0L))
+    frontend ! MalbaProtocol.AddTaskRequest ( "id21", "id21", "from1", Some( "group1" ), Map.empty[String, String], "taskType1", "contents21")
+    expectMsg(MalbaProtocol.AddTaskResponse ( "id21", "from1", "id21", Some( "group1" ), "taskType1", MalbaProtocol.Ok, 0L, 0L, 0L))
+    frontend ! MalbaProtocol.AddTaskRequest ( "id22", "id22", "from1", Some( "group1" ), Map.empty[String, String], "taskType1", "contents22")
+    expectMsg(MalbaProtocol.AddTaskResponse ( "id22", "from1", "id22", Some( "group1" ), "taskType1", MalbaProtocol.Ok, 0L, 0L, 0L))
 
     backendSystem.shutdown()
 

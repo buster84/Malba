@@ -34,15 +34,14 @@ object MalbaBuild extends Build {
     scalaVersion              := Dependencies.Versions.scalaVer,
     resolvers                 := resolversList,
     externalResolvers         := externalResolversList,
-    parallelExecution in Test := false,
-    testOptions in Test       += Tests.Argument(TestFrameworks.ScalaTest, "-u", "target/test-reports")
+    parallelExecution in Test := false
   )
 
   lazy val root = Project(
     id        = "malba",
     base      = file("."),
     settings  = buildSettings,
-    aggregate = Seq(master, protocol, client)
+    aggregate = Seq(master, protocol, client, clientPlayPlugin)
   )
 
   lazy val protocol = Project(
@@ -57,8 +56,14 @@ object MalbaBuild extends Build {
   )
 
   lazy val client = Project(
-    id           = "malba-master",
+    id           = "malba-client",
     base         = file("Malba-client"),
     dependencies = Seq(protocol)
+  )
+
+  lazy val clientPlayPlugin = Project(
+    id           = "malba-client-playPlugin",
+    base         = file("Malba-client-playPlugin"),
+    dependencies = Seq(client)
   )
 }

@@ -87,6 +87,7 @@ class WorkerManager(id: String, master: ActorRef) extends PersistentActor with A
     case MasterProtocol.Notify( taskType ) => 
       workerRefs.foreach {
         case ( `taskType`, workers ) => workers.foreach(worker => worker._2 ! WorkerProtocol.TaskIsReady) 
+        case _ => ()
       }
 
     case CleanupTick =>
@@ -104,6 +105,7 @@ class WorkerManager(id: String, master: ActorRef) extends PersistentActor with A
                 workerState = workerState.updated(evt)
                 killWorker(evt.actorPath, evt.taskType)
               }
+            case _ => () // Nothing to do
           }
       }
   }

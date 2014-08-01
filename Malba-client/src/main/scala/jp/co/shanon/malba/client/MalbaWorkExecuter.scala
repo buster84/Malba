@@ -151,6 +151,8 @@ class MalbaWorkManager(
 
     case MalbaWorkProtocol.WorkComplete =>
       context.setReceiveTimeout(Duration.Undefined)
+      context.unwatch(worker)
+      context.stop(worker)
       val duration = new org.joda.time.Duration(startDate, DateTime.now())
       log.info(s"Finished task taskType=${taskType} id=${task.id} complete time=${duration.getStandardSeconds().toString}")
       receiverWithConnecting(idle)

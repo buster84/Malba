@@ -53,15 +53,23 @@ start() {
     
     # FIXME figure out how to use daemon correctly
     echo $@ 
-    command="${RUN_CMD} $@"
+    command="nohup ${RUN_CMD} $@ >> /var/log/${{app_name}}/daemon.log 2>&1 &"
     echo $command
-    #nohup runuser -s /bin/bash $DAEMON_USER -c "$command" >> /var/log/${{app_name}}/daemon.log 2>&1 &
+    runuser -s /bin/bash $DAEMON_USER -c "$command"
 
     # The way to go, but doesn't work properly
     # If the app creates the pid file this gets messy
-    daemon --user $DAEMON_USER --pidfile $PIDFILE $command &
+    # daemon --user $DAEMON_USER --pidfile $PIDFILE $RUN_CMD &
+    
     
     retval=$?   # last error code
+    PID=$!      # pid of last backgrounded process
+    [ $retval -eq 0 ] && touch ${lockfile} && success || failure
+    
+    # Insert pid into pid file for CentOS killproc function
+    [ -d "/var/run/${{app_name}}" ] || install -d -o "$DAEMON_USER" -m750 "/var/run/${{app_name}}"
+    echo
+    echo $PID > ${PIDFILE}
     return $retval
 }
 

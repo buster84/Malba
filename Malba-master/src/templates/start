@@ -53,9 +53,9 @@ start() {
     
     # FIXME figure out how to use daemon correctly
     echo $@ 
-    command="nohup ${RUN_CMD} $@ >> /var/log/${{app_name}}/daemon.log 2>&1 &"
+    command="${RUN_CMD} $@"
     echo $command
-    runuser -s /bin/bash $DAEMON_USER -c "$command"
+    nohup runuser -s /bin/bash $DAEMON_USER --session-command "$command" >> /var/log/${{app_name}}/daemon.log 2>&1 &
 
     # The way to go, but doesn't work properly
     # If the app creates the pid file this gets messy
@@ -71,6 +71,7 @@ start() {
     echo
     echo $PID > ${PIDFILE}
     return $retval
+
 }
 
 stop() {

@@ -62,17 +62,17 @@ def update():
     with cd(workspace):
         run('wget %s' % (artifact_url))
         run('yum install -y ./*rpm')
+        run('echo " -java-home %s" >> %s' % (java_home, prog))
+        run('echo " -mem %s" >> %s' % (mem, prog))
+        run('echo " -Dconfig.resource=%s" >> %s' % ("application_" + mode + ".conf", prog))
+        run('echo " -Dlogback.configurationFile=%s" >> %s' % ("logger_" + mode + ".xml", prog))
+        run('echo " -DAKKA_PORT=%s" >> %s' % (akka_port, prog))
+        run('echo " -DSELF_IP=%s" >> %s' % (env.host, prog))
+        run('mv %s /etc/default/' % (prog))
     run('rm -rf %s' % (workspace))
 
 def start():
-    data = {"app_name"         : prog,
-            "mem"              : mem,
-            "akka_port"        : akka_port,
-            "self_ip"          : env.host,
-            "application_conf" : "application_" + mode + ".conf",
-            "logger_conf"      : "logger_" + mode + ".xml"}
-    with shell_env(JAVA_HOME=java_home, AKKA_PORT=akka_port, SELF_IP=env.host):
-        run('service %(app_name)s start -mem %(mem)s -Dconfig.resource=%(application_conf)s -Dlogback.configurationFile=%(logger_conf)s -DAKKA_PORT=%(akka_port)s -DSELF_IP=%(self_ip)s' % (data))
+    run('service %s start ' % (prog))
 
 def restart():
     if checkStatus():

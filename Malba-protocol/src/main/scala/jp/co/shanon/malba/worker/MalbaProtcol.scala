@@ -1,11 +1,22 @@
 package jp.co.shanon.malba.worker
 import akka.actor.ActorRef
+import org.joda.time.DateTime
 
 object MalbaProtocol {
   //
   // Add tasks protocol
   //
   case class AddTaskRequest (
+    id: String,
+    taskId: String,
+    from: String,
+    group: Option[String],
+    option: Map[String, String] = Map.empty[String, String],
+    taskType: String,
+    task: String
+  )
+
+  case class AddTaskWithCheckWorkState (
     id: String,
     taskId: String,
     from: String,
@@ -160,6 +171,30 @@ object MalbaProtocol {
     actorPath: String,
     status: Status
   )
+
+  //
+  // Get worker's state
+  // 
+  case class GetWorkerStateRequest (
+    taskType: String
+  )
+  case class GetWorkerStateResponse (
+    taskType: String,
+    workerStateList: Seq[State]
+  )
+  trait State {
+    val state: String
+  }
+  case class Busy(actor: ActorRef, task: Task, startDate: DateTime, tryCount: Int) extends State {
+    val state = "busy"
+  }
+  case class Idle(actor: ActorRef) extends State {
+    val state = "idle"
+  }
+  case class Unknown(actorPath: String) extends State {
+    val state = "unknown"
+  }
+
 
   //
   // Internal server error 

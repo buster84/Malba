@@ -137,7 +137,7 @@ class MasterSpec(var _system: ActorSystem)
     val actorPath     = MasterSpec.actorPath + "1"
 
     // Add task
-    within(15.seconds) {
+    within(20.seconds) {
       awaitAssert {
         frontend ! MalbaProtocol.AddTaskRequest ( "id1","id1", "from1", None, Map.empty[String, String], "taskType1", "contents1")
         expectMsg(MalbaProtocol.AddTaskResponse ( "id1", "from1", "id1",None, "taskType1", MalbaProtocol.Ok, 0L, 0L, 0L))
@@ -148,6 +148,16 @@ class MasterSpec(var _system: ActorSystem)
 
         frontend ! MalbaProtocol.AddTaskRequest ( "id3","id3", "from1", None, Map.empty[String, String], "taskType2", "contents3")
         expectMsg(MalbaProtocol.AddTaskResponse ( "id3", "from1", "id3",None, "taskType2", MalbaProtocol.Ok, 0L, 0L, 0L))
+
+        frontend ! MalbaProtocol.AddTaskWithCheckWorkState ( "id1a","id1a", "from1", None, Map.empty[String, String], "taskType1a", "contents1a")
+        expectMsg(MalbaProtocol.AddTaskResponse ( "id1a", "from1", "id1a",None, "taskType1a", MalbaProtocol.Ok, 0L, 0L, 0L))
+        frontend ! MalbaProtocol.AddTaskWithCheckWorkState ( "id1a","id1a", "from1", None, Map.empty[String, String], "taskType1a", "contents1a")
+        expectMsg(MalbaProtocol.AddTaskResponse ( "id1a", "from1", "id1a",None, "taskType1a", MalbaProtocol.Ok, 0L, 0L, 0L))
+        frontend ! MalbaProtocol.AddTaskWithCheckWorkState ( "id2a","id2a", "from1", None, Map.empty[String, String], "taskType1a", "contents2a")
+        expectMsg(MalbaProtocol.AddTaskResponse ( "id2a", "from1", "id2a",None, "taskType1a", MalbaProtocol.Ok, 0L, 0L, 0L))
+
+        frontend ! MalbaProtocol.AddTaskWithCheckWorkState ( "id3a","id3a", "from1", None, Map.empty[String, String], "taskType2a", "contents3a")
+        expectMsg(MalbaProtocol.AddTaskResponse ( "id3a", "from1", "id3a",None, "taskType2a", MalbaProtocol.Ok, 0L, 0L, 0L))
       }
     }
 
@@ -212,7 +222,7 @@ class MasterSpec(var _system: ActorSystem)
 
     backendSystem.shutdown()
 
-    within(15.seconds) {
+    within(20.seconds) {
       awaitAssert {
         frontend ! MalbaProtocol.GetTaskRequest ( "id23", "from1", "taskType1")                                                             
         expectMsg(MalbaProtocol.GetTaskResponse ( "id23", "from1", "taskType1", MalbaProtocol.Ok, Task( "id20", "taskType1", "contents20" ))) 

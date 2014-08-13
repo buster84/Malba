@@ -61,6 +61,9 @@ class Worker(actorPath: String, taskType: String, master: ActorRef) extends Acto
 
     case message : MalbaProtocol.GetTaskRequest =>
       master forward message
+
+    case WorkerProtocol.GetState =>
+      taskExecuter forward WorkerProtocol.GetState
   }
 
   override def unhandled(message: Any): Unit = message match {

@@ -4,6 +4,7 @@ import scala.collection.immutable.Queue
 import akka.actor.Actor
 import akka.actor.ActorLogging
 import akka.actor.ActorRef
+import akka.pattern._
 import scala.concurrent.duration.Deadline
 import scala.concurrent.duration.FiniteDuration
 import akka.actor.Props
@@ -90,6 +91,9 @@ class Master(workManagerId: String) extends PersistentActor with ActorLogging {
     case message @ MalbaProtocol.AddWorkerRequest( id, taskType, actorPath ) =>
       workerManager forward message
 
+    case message @ MalbaProtocol.GetWorkerStateRequest(_) =>
+      workerManager forward message
+
     case MalbaProtocol.AddTaskRequest ( id, taskId, from, group, option, taskType, task ) =>
       if(commandIdForAddTask.isDefinedAt(id)){
         val response: MalbaProtocol.AddTaskResponse = commandIdForAddTask.apply( id )._1
@@ -107,6 +111,36 @@ class Master(workManagerId: String) extends PersistentActor with ActorLogging {
             addTask(evt)
             sender() ! response
             workerManager ! MasterProtocol.Notify(evt.taskType)
+          }
+        }
+      }
+
+    case request @ MalbaProtocol.AddTaskWithCheckWorkState ( id, taskId, from, group, option, taskType, task ) =>
+      if(commandIdForAddTask.isDefinedAt(id)){
+        val response: MalbaProtocol.AddTaskResponse = commandIdForAddTask.apply( id )._1
+        sender() ! response
+      } else {
+        if(masterState.contains(taskType, taskId)){
+          val response = MalbaProtocol.AddTaskResponse(id, taskId, from, group, taskType, MalbaProtocol.Reject("409", "Duplicate task id"), 0L, 0L, 0L)
+          commandIdForAddTask = commandIdForAddTask + (id -> Tuple2(response, getDeadline))
+          sender() ! response
+        } else {
+          implicit val timeout = akka.util.Timeout(5.seconds)
+          val fromActor = sender()
+          (workerManager ? MalbaProtocol.GetWorkerStateRequest(taskType)).mapTo[MalbaProtocol.GetWorkerStateResponse].foreach{ workerStateRes =>
+            val existsTaskId: Boolean = {
+              workerStateRes.workerStateList.exists { 
+                case state: MalbaProtocol.Busy => taskId == state.task.id
+                case _ => false
+              }
+            }
+            if(existsTaskId){
+              val response = MalbaProtocol.AddTaskResponse(id, taskId, from, group, taskType, MalbaProtocol.Reject("409", "Duplicate task id"), 0L, 0L, 0L)
+              commandIdForAddTask = commandIdForAddTask + (id -> Tuple2(response, getDeadline))
+              fromActor ! response
+            } else {
+              self.tell(MalbaProtocol.AddTaskRequest ( id, taskId, from, group, option, taskType, task ), fromActor)
+            }
           }
         }
       }

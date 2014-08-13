@@ -51,6 +51,8 @@ object WorkerManagerSpec {
 
   class WorkExecutor(ref: ActorRef) extends Actor {
     def receive = {
+      case WorkerProtocol.GetState =>
+        sender() ! MalbaProtocol.Unknown("hoge")
       case WorkerProtocol.TaskIsReady =>
         sender() ! MalbaProtocol.GetTaskRequest(requestid, from, taskType)
       case m: MalbaProtocol.GetTaskResponse =>
@@ -183,6 +185,22 @@ class WorkerManagerSpec(var _system: ActorSystem)
       awaitAssert {
         workerManager ! MalbaProtocol.AddWorkerRequest( "id3", WorkerManagerSpec.taskType, actorPath )
         expectMsg(MalbaProtocol.AddWorkerResponse ( "id3", WorkerManagerSpec.taskType, actorPath, MalbaProtocol.Ok ))
+      }
+    }
+  }
+
+  it should "return worker state" in {
+    val master        = TestProbe()
+    val workerManager = system.actorOf(Props(classOf[WorkerManager], "workerManager6", master.ref), "workerManager6")
+    val taskExecuter  = taskExecuterSystem.actorOf(Props(classOf[WorkerManagerSpec.WorkExecutor], testProbe.ref), "taskExecuter6")
+    val actorPath     = WorkerManagerSpec.actorPath + "6"
+
+    within(10.seconds) {
+      awaitAssert {
+        workerManager ! MalbaProtocol.AddWorkerRequest( "id4", WorkerManagerSpec.taskType, actorPath )
+        expectMsg(MalbaProtocol.AddWorkerResponse ( "id4", WorkerManagerSpec.taskType, actorPath, MalbaProtocol.Ok ))
+        workerManager ! MalbaProtocol.GetWorkerStateRequest( WorkerManagerSpec.taskType )
+        expectMsg(MalbaProtocol.GetWorkerStateResponse ( WorkerManagerSpec.taskType, Seq(MalbaProtocol.Unknown("hoge"))))
       }
     }
   }

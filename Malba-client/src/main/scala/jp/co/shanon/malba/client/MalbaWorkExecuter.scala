@@ -154,6 +154,10 @@ class MalbaWorkManager(
   }
 
   def working(worker: ActorRef, task: Task, startDate: DateTime = DateTime.now(), tryCount: Int = 1): Receive = {
+    case MalbaWorkProtocol.Closing => 
+      isStopping = true
+      worker ! MalbaWorkProtocol.Closing
+
     case GetState     =>
       sender() ! MalbaProtocol.Busy(self, task, startDate, tryCount)
 

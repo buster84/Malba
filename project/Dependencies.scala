@@ -50,7 +50,8 @@ object Dependencies {
   )
 
   val protocol = Seq(
-    "com.typesafe.akka" %% "akka-actor"   % "2.2.4"
+    "com.typesafe.akka" %% "akka-actor"   % "2.2.4",
+    jodatime, jodaconvert
   )
 
   val clientPlayPlugin = Seq(

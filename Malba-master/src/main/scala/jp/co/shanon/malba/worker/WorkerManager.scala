@@ -4,6 +4,7 @@ import akka.actor.Actor
 import akka.actor.ActorLogging
 import akka.actor.ActorRef
 import akka.actor.Terminated
+import akka.pattern._
 import scala.concurrent.duration.Deadline
 import scala.concurrent.duration.FiniteDuration
 import akka.actor.Props
@@ -12,6 +13,7 @@ import akka.cluster.Cluster
 import akka.persistence.PersistentActor
 import akka.persistence.AtLeastOnceDelivery
 import akka.persistence.RecoveryCompleted
+import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -89,6 +91,20 @@ class WorkerManager(id: String, master: ActorRef) extends PersistentActor with A
         case ( `taskType`, workers ) => workers.foreach(worker => worker._2 ! WorkerProtocol.TaskIsReady) 
         case _ => ()
       }
+    case MalbaProtocol.GetWorkerStateRequest( taskType ) =>
+      implicit val timeout = akka.util.Timeout(5.seconds)
+      workerRefs.get(taskType).map{ workers =>
+        Future.sequence(workers.map { worker => 
+          (worker._2 ? WorkerProtocol.GetState).mapTo[MalbaProtocol.State] recover {
+            case e: Exception => 
+              log.error(e, s"Couldn't get worker state. message: ${e.getMessage}")
+              MalbaProtocol.Unknown(worker._1)
+          }
+        }).map(stateList => MalbaProtocol.GetWorkerStateResponse( taskType, stateList ))
+      }.getOrElse {
+        Future.successful(MalbaProtocol.GetWorkerStateResponse( taskType, Seq.empty[MalbaProtocol.State]))
+      } pipeTo sender()
+      ()
 
     case CleanupTick =>
       commandIds = commandIds.filterNot{

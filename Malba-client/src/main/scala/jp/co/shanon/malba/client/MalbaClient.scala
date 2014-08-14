@@ -37,6 +37,26 @@ class MalbaClient(system: ActorSystem, from: String, timeout: FiniteDuration, ma
     }
   }
 
+  def addTaskWithCheck ( taskId: String, group: Option[String], option: Map[String, String] = Map.empty[String, String], taskType: String, task: String ): Future[MalbaProtocol.Status] = {
+    val addTaskRequest = MalbaProtocol.AddTaskWithCheckWorkState (
+      id       = makeRequestId,
+      taskId   = taskId,
+      from     = from,
+      group    = group,
+      option   = option,
+      taskType = taskType,
+      task     = task
+    )
+
+    (system.actorOf(Props( classOf[MalbaRequestHandler], router, timeout, maxRetry )) ask addTaskRequest).map {
+      case NoResponse =>
+        throw new Exception("Can't get response")
+      case MalbaProtocol.AddTaskResponse(id, taskId, from, group, taskType, status, _, _, _) =>
+        status
+    }
+  }
+
+
   def getTask(taskType: String): Future[MalbaProtocol.GetTaskResponseBase] = {
     val getTaskRequest = MalbaProtocol.GetTaskRequest (
       id       = makeRequestId,
@@ -47,6 +67,16 @@ class MalbaClient(system: ActorSystem, from: String, timeout: FiniteDuration, ma
       case NoResponse =>
         throw new Exception("Can't get response")
       case res: MalbaProtocol.GetTaskResponseBase =>
+        res
+    }
+  }
+
+  def getWorkerState(taskType: String): Future[MalbaProtocol.GetWorkerStateResponse] = {
+    val request = MalbaProtocol.GetWorkerStateRequest(taskType)
+    (system.actorOf(Props( classOf[MalbaRequestHandler], router, timeout, maxRetry )) ask request).map {
+      case NoResponse =>
+        throw new Exception("Can't get response")
+      case res: MalbaProtocol.GetWorkerStateResponse =>
         res
     }
   }

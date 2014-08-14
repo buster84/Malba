@@ -12,6 +12,7 @@ import akka.actor.SupervisorStrategy.Stop
 import akka.actor.SupervisorStrategy.Restart
 import akka.actor.ActorInitializationException
 import akka.actor.DeathPactException
+import akka.actor.Stash
 import akka.pattern.pipe
 import akka.pattern.ask
 import akka.util.Timeout
@@ -19,6 +20,7 @@ import org.joda.time.DateTime
 import scala.concurrent._
 import scala.concurrent.duration._
 import jp.co.shanon.malba.worker.WorkerProtocol.TaskIsReady
+import jp.co.shanon.malba.worker.WorkerProtocol.GetState
 import jp.co.shanon.malba.worker.MalbaProtocol
 import jp.co.shanon.malba.worker.Task
 
@@ -68,7 +70,7 @@ class MalbaWorkManager(
   pollingInterval: FiniteDuration,
   workTimeout: Duration,
   maxRetryCount: Int
-) extends Actor with ActorLogging {
+) extends Actor with Stash with ActorLogging {
   import context.dispatcher
   override def supervisorStrategy = OneForOneStrategy() {
     case e: Exception => 
@@ -121,6 +123,7 @@ class MalbaWorkManager(
   }
 
   def idle: Receive = {
+    case GetState => sender() ! MalbaProtocol.Idle(self)
     case MalbaWorkProtocol.IsWorking => sender() ! false
     case TaskIsReady => 
       if(!isStopping){
@@ -130,23 +133,34 @@ class MalbaWorkManager(
   }
 
   def waitForTask: Receive = {
+    case GetState     => stash()
     case MalbaWorkProtocol.IsWorking => sender() ! true
     case MalbaProtocol.GetTaskResponse( id, from, taskType, status, task ) =>
       val worker = context.watch(context.actorOf(workExecutorProps))
       context.setReceiveTimeout(workTimeout)
       receiverWithConnecting(working(worker, task))
       worker ! task
+      unstashAll()
 
     case MalbaProtocol.GetNoTaskResponse( id, from, taskType ) =>
       log.info(s"No task. taskType=${taskType} id=${id}")
       receiverWithConnecting(idle)
+      unstashAll()
 
     case akka.actor.Status.Failure(e) =>
       log.error(s"Failed to get task. ${e.getMessage} ${e.getStackTrace()}")
       receiverWithConnecting(idle)
+      unstashAll()
   }
 
   def working(worker: ActorRef, task: Task, startDate: DateTime = DateTime.now(), tryCount: Int = 1): Receive = {
+    case MalbaWorkProtocol.Closing => 
+      isStopping = true
+      worker ! MalbaWorkProtocol.Closing
+
+    case GetState     =>
+      sender() ! MalbaProtocol.Busy(self, task, startDate, tryCount)
+
     case MalbaWorkProtocol.IsWorking => sender() ! true
 
     case MalbaWorkProtocol.WorkComplete =>

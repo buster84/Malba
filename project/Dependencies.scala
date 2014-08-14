@@ -6,7 +6,7 @@ import sbt._
 object Dependencies {
   object Versions {
     val scalaVer = "2.10.4"
-    val akkaVer  = "2.3.4"
+    val akkaVer  = "2.3.5"
   }
 
   import Versions._

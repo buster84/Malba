@@ -73,7 +73,7 @@ class MalbaWorkManager(
 ) extends Actor with Stash with ActorLogging {
   import context.dispatcher
   override def supervisorStrategy = OneForOneStrategy() {
-    case e: Exception => 
+    case e: Throwable => 
       log.error(s"Unknow error happen. message: ${e.getMessage} ${e.getStackTrace}")
       receiverWithConnecting(idle)
       Stop

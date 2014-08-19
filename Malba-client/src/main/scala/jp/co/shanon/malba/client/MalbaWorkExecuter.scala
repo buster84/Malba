@@ -72,10 +72,10 @@ class MalbaWorkManager(
   maxRetryCount: Int
 ) extends Actor with Stash with ActorLogging {
   import context.dispatcher
-  override def supervisorStrategy = OneForOneStrategy() {
+  override val supervisorStrategy = OneForOneStrategy() {
     case e: Throwable => 
-      log.error(s"Unknow error happen. message: ${e.getMessage} ${e.getStackTrace}")
-      receiverWithConnecting(idle)
+      log.error(e, s"Unknow error happen. message: ${e.getMessage}")
+      self ! MalbaWorkProtocol.WorkFail
       Stop
   }
 
@@ -173,6 +173,21 @@ class MalbaWorkManager(
       
       self ! TaskIsReady
 
+    case MalbaWorkProtocol.WorkFail =>
+      log.error("Failed task. taskType=${taskType}.")
+      context.unwatch(worker)
+
+      if(maxRetryCount > tryCount) {
+        log.info(s"Try again taskType=${taskType}")
+        val newWorker = context.watch(context.actorOf(workExecutorProps))
+        receiverWithConnecting(working(newWorker, task, startDate, tryCount + 1))
+        newWorker ! task
+      } else {
+        log.info(s"Become idle taskType=${taskType}")
+        receiverWithConnecting(idle)
+        context.setReceiveTimeout(Duration.Undefined)
+      }
+
     case ReceiveTimeout if maxRetryCount > tryCount =>
       log.warning(s"Receive timeout. Try count is ${tryCount.toString} taskType=${taskType}. Trying again.")
       context.unwatch(worker)
@@ -190,18 +205,7 @@ class MalbaWorkManager(
 
     case Terminated(`worker`) => 
       log.error(s"Terminated worker[${worker.toString}]. Try count is ${tryCount.toString} taskType=${taskType}.")
-      context.unwatch(worker)
-
-      if(maxRetryCount > tryCount) {
-        log.info(s"Try again taskType=${taskType}")
-        val newWorker = context.watch(context.actorOf(workExecutorProps))
-        receiverWithConnecting(working(newWorker, task, startDate, tryCount + 1))
-        newWorker ! task
-      } else {
-        log.info(s"Become idle taskType=${taskType}")
-        receiverWithConnecting(idle)
-        context.setReceiveTimeout(Duration.Undefined)
-      }
+      self ! MalbaWorkProtocol.WorkFail
   }
 
   override def unhandled(message: Any): Unit = message match {

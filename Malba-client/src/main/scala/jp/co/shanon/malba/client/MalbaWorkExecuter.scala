@@ -170,6 +170,8 @@ class MalbaWorkManager(
       val duration = new org.joda.time.Duration(startDate, DateTime.now())
       log.info(s"Finished task taskType=${taskType} id=${task.id} complete time=${duration.getStandardSeconds().toString}")
       receiverWithConnecting(idle)
+      
+      self ! TaskIsReady
 
     case ReceiveTimeout if maxRetryCount > tryCount =>
       log.warning(s"Receive timeout. Try count is ${tryCount.toString} taskType=${taskType}. Trying again.")

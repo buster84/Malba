@@ -4,5 +4,6 @@ object MalbaWorkProtocol {
   case object Closing
   case object IsWorking
   case object WorkComplete
+  case object WorkFail
 }
 

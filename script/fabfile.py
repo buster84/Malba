@@ -40,6 +40,7 @@ def randstrings():
     return string
 
 def deploy():
+    monit_monitor('unmonitor')
     if checkStatus():
         stop()
     update()
@@ -47,6 +48,11 @@ def deploy():
     if not checkStatus():
         abort('Can not run %s' % (prog))
     time.sleep(60.0)
+    monit_monitor('monitor')
+
+def monit_monitor(mode):
+    run('monit %s %s' % (mode,prog))
+
 
 def stop():
     run('service %s stop' % (prog))
@@ -75,12 +81,14 @@ def start():
     run('service %s start ' % (prog))
 
 def restart():
+    monit_monitor('unmonitor')
     if checkStatus():
         stop()
     start()
     if not checkStatus():
         abort('Can not run %s' % (prog))
     time.sleep(60.0)
+    monit_monitor('monitor')
 
 def checkStatus():
     status = run('service %s status | grep -o running || echo "stopped"' % (prog))

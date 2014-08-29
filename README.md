@@ -11,11 +11,19 @@ Main features are:
 How to use 
 --------------------
 ###Change configuration
+* [Malba-master.conf](Malba-master/src/main/resources/Malba-master.conf)
+* [application.conf](Malba-master/src/main/resources/application.conf)
+* More details. See [here](http://doc.akka.io/docs/akka/snapshot/general/configuration.html#config-akka-persistence)
 
 ###Start Malba
 ```sh
 $ activator malba-master/run
 ```
+
+
+How to use with Play!
+---------------------
+See this [project]()
 
 ## Under The Apache License, Version 2.0
 http://www.apache.org/licenses/LICENSE-2.0.html

@@ -23,7 +23,7 @@ $ activator malba-master/run
 
 How to use with Play!
 ---------------------
-See this [project]()
+See this [project](sample/play2.3)
 
 ## Under The Apache License, Version 2.0
 http://www.apache.org/licenses/LICENSE-2.0.html

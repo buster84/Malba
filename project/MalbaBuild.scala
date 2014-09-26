@@ -4,7 +4,7 @@ import sbt.Keys._
 import sbt._
 
 object MalbaBuild extends Build {
-  val appVersion = "0.7"
+  val appVersion = "0.8"
 
   val appName    = "Malba"
 

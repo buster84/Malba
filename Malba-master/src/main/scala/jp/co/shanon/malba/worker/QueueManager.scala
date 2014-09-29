@@ -210,7 +210,7 @@ class QueueManager extends PersistentActor with ActorLogging {
       commandIdForCancelTask = commandIdForCancelTask.filterNot {
         case (_, (_, deadline)) => deadline.isOverdue
       }
-    case PersistenceFailure(payload, sequenceNumber, cause) ⇒
+    case PersistenceFailure(payload, sequenceNumber, cause) =>
       val errorMsg = "Failed to store data into journal" +
         s"(persistent id = [${persistenceId}], sequence nr = [${sequenceNumber}], payload class = [${payload.getClass.getName}]). " + cause
       log.error(cause, errorMsg)

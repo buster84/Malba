@@ -19,11 +19,11 @@ import scala.concurrent.duration._
 
 object Master {
 
-  def props(workManagerId: String): Props =
-    Props(classOf[Master], workManagerId)
+  def props(workManagerId: String, snapshotInterval: FiniteDuration): Props =
+    Props(classOf[Master], workManagerId, snapshotInterval)
 }
 
-class Master(workManagerId: String) extends Actor with ActorLogging {
+class Master(workManagerId: String, snapshotInterval: FiniteDuration) extends Actor with ActorLogging {
 
   override val supervisorStrategy = OneForOneStrategy(maxNrOfRetries = 10, withinTimeRange = Duration(1, MINUTES)) {
     case e: Throwable => 
@@ -35,7 +35,7 @@ class Master(workManagerId: String) extends Actor with ActorLogging {
   }
 
   val workerManager = context.actorOf(Props(classOf[WorkerManager], workManagerId, self), "workerManager")
-  val queueManager  = context.actorOf(QueueManager.props())
+  val queueManager  = context.actorOf(QueueManager.props(snapshotInterval))
 
   def receive = {
     case message : MasterProtocol.Notify =>

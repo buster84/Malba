@@ -26,18 +26,25 @@ object Main {
     val role            = "backend"
 
     val conf = if (args.isEmpty) {
-      ConfigFactory.parseString(s"akka.cluster.roles=[$role]").
-        withFallback(ConfigFactory.load())
+      ConfigFactory.parseString(s"akka.cluster.roles=[$role]")
+        .withFallback(ConfigFactory.load())
+        .withFallback(ConfigFactory.parseString("malba.take.snapshot.interval-minute=1440"))
     } else {
       val port            = args(0)
-      ConfigFactory.parseString(s"akka.cluster.roles=[$role]").
-        withFallback(ConfigFactory.parseString("akka.remote.netty.tcp.port=" + port)).
-        withFallback(ConfigFactory.load())
+      ConfigFactory.parseString(s"akka.cluster.roles=[$role]")
+        .withFallback(ConfigFactory.parseString("akka.remote.netty.tcp.port=" + port))
+        .withFallback(ConfigFactory.load())
+        .withFallback(ConfigFactory.parseString("malba.take.snapshot.interval-minute=1440"))
+    }
+
+    val snapshotInterval = {
+      val minutes = conf.getInt("malba.take.snapshot.interval-minute")
+      Duration(minutes, MINUTES)
     }
 
     val system = ActorSystem("MalbaSystem", conf)
 
-    system.actorOf(ClusterSingletonManager.props(Master.props(workerManagerId), "active", PoisonPill, Some(role)), "master")
+    system.actorOf(ClusterSingletonManager.props(Master.props(workerManagerId, snapshotInterval), "active", PoisonPill, Some(role)), "master")
     system.actorOf(Props[Frontend], "frontend")
     ()
   }

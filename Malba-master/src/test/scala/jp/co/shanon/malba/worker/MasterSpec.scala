@@ -126,9 +126,9 @@ class MasterSpec(var _system: ActorSystem)
 
   "Master" should "work as queuing server" in {
 
-    val singletonManager1 = backendSystem.actorOf(ClusterSingletonManager.props(Props( classOf[Master], "workerManager1" ), "active",
+    val singletonManager1 = backendSystem.actorOf(ClusterSingletonManager.props(Props( classOf[Master], "workerManager1", Duration(100, MILLISECONDS) ), "active",
       PoisonPill, Some("backend"), 5, 4), "master")
-    val singletonManager2 = backendSystem2.actorOf(ClusterSingletonManager.props(Props( classOf[Master], "workerManager1" ), "active",
+    val singletonManager2 = backendSystem2.actorOf(ClusterSingletonManager.props(Props( classOf[Master], "workerManager1", Duration(100, MILLISECONDS) ), "active",
       PoisonPill, Some("backend"), 5, 4), "master")
 
     val frontend = system.actorOf(Props[Frontend], "frontend")
@@ -219,6 +219,7 @@ class MasterSpec(var _system: ActorSystem)
     expectMsg(MalbaProtocol.AddTaskResponse ( "id21", "from1", "id21", Some( "group1" ), "taskType1", MalbaProtocol.Ok, 0L, 0L, 0L))
     frontend ! MalbaProtocol.AddTaskRequest ( "id22", "id22", "from1", Some( "group1" ), Map.empty[String, String], "taskType1", "contents22")
     expectMsg(MalbaProtocol.AddTaskResponse ( "id22", "from1", "id22", Some( "group1" ), "taskType1", MalbaProtocol.Ok, 0L, 0L, 0L))
+    Thread.sleep(1000)
 
     backendSystem.shutdown()
 

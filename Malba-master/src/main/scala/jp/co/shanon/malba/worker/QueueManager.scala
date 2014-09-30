@@ -14,16 +14,22 @@ import akka.persistence.PersistentActor
 import akka.persistence.AtLeastOnceDelivery
 import akka.persistence.RecoveryFailure
 import akka.persistence.PersistenceFailure
+import akka.persistence.SaveSnapshotFailure
+import akka.persistence.SaveSnapshotSuccess
+import akka.persistence.SnapshotOffer
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
 object QueueManager {
 
-  def props(): Props =
-    Props(classOf[QueueManager])
+  def props(snapshotInterval: FiniteDuration): Props =
+    Props(classOf[QueueManager], snapshotInterval)
+
+  case object TakeSnapshotTick
 }
 
-class QueueManager extends PersistentActor with ActorLogging {
+class QueueManager(snapshotInterval: FiniteDuration) extends PersistentActor with ActorLogging {
+  import QueueManager._
   private case object CleanupTick
   val deleteAfter: FiniteDuration = Duration(30, SECONDS)
   def getDeadline = {
@@ -34,9 +40,13 @@ class QueueManager extends PersistentActor with ActorLogging {
   var commandIdForGetTask: Map[String, (MalbaProtocol.GetTaskResponseBase, Deadline)]   = Map.empty[String, (MalbaProtocol.GetTaskResponseBase, Deadline)]
   var commandIdForCancelTask: Map[String, (MalbaProtocol.CancelTaskResponse, Deadline)] = Map.empty[String, (MalbaProtocol.CancelTaskResponse, Deadline)]
 
-  val cleanupTask = context.system.scheduler.schedule(deleteAfter, deleteAfter, self, CleanupTick)
+  val cleanupTask          = context.system.scheduler.schedule(deleteAfter, deleteAfter, self, CleanupTick)
+
+  val takeSnapshotSchedule = context.system.scheduler.schedule(snapshotInterval, snapshotInterval, self, TakeSnapshotTick)
+
   override def postStop(): Unit = {
     cleanupTask.cancel()
+    takeSnapshotSchedule.cancel()
     ()
   }
 
@@ -57,6 +67,9 @@ class QueueManager extends PersistentActor with ActorLogging {
       cancelTaskByGroup(event)
     case event: MasterState.TaskCanceledById => 
       cancelTaskById(event)
+    case SnapshotOffer(metadata, state: MasterState) =>
+      log.info(s"Recover from snapshot (metadata = ${metadata.toString})")
+      masterState = state
     case RecoveryFailure(cause) =>
       log.error(cause, s"Failed to recover (persisten id = [${persistenceId}])")
       throw new Exception(s"Failed to recover (persisten id = [${persistenceId}])")
@@ -210,6 +223,22 @@ class QueueManager extends PersistentActor with ActorLogging {
       commandIdForCancelTask = commandIdForCancelTask.filterNot {
         case (_, (_, deadline)) => deadline.isOverdue
       }
+
+    case TakeSnapshotTick =>
+      saveSnapshot(masterState)
+
+    case SaveSnapshotSuccess(metadata) =>
+      log.info(s"Succeed to take snapshot (persistent id = [${persistenceId}], metadata = [${metadata.toString}])")
+      val sequenceNr = metadata.sequenceNr - 1
+      log.info(s"Try to delete messages with sequence numbers less than or equal to ${sequenceNr.toString}")
+      deleteMessages(sequenceNr)
+
+    case SaveSnapshotFailure(metadata, cause) =>
+      val errorMsg = "Failed to take snapshot" +
+        s"(persistent id = [${persistenceId}], metadata = [${metadata.toString}]). " + cause
+      log.error(cause, errorMsg)
+      throw new Exception(errorMsg)
+
     case PersistenceFailure(payload, sequenceNumber, cause) =>
       val errorMsg = "Failed to store data into journal" +
         s"(persistent id = [${persistenceId}], sequence nr = [${sequenceNumber}], payload class = [${payload.getClass.getName}]). " + cause

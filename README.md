@@ -27,7 +27,7 @@ See this [project](sample/play2.3)
 
 Slide
 ---------------------
-* [Job queue in B2B with Akka](http://www.slideshare.net/YasukiOkumura/job-queue-38630397)
+* [Job queue in B2B with Akka](http://www.slideshare.net/YasukiOkumura/job-queue-in-b2b-with-akka-long-version)
 
 ## Under The Apache License, Version 2.0
 http://www.apache.org/licenses/LICENSE-2.0.html

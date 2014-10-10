@@ -18,6 +18,8 @@ class MalbaRequestHandler(router: ActorRef, timeout: FiniteDuration, maxRetry: I
 
   import context.dispatcher
 
+  val delayTime = Duration(1, SECONDS)
+
   def receive = {
     case request => 
       context.setReceiveTimeout(timeout)
@@ -26,22 +28,40 @@ class MalbaRequestHandler(router: ActorRef, timeout: FiniteDuration, maxRetry: I
   }
 
   def waitForResponse(from: ActorRef, request: Any, tryCount: Int): Receive = {
-    case ReceiveTimeout if maxRetry > tryCount =>
-      log.warning(s"No response from Malba, retrying ${tryCount.toString} times.")
-      context.become(waitForResponse(from, request, tryCount + 1))
-      router ! request
-
     case ReceiveTimeout =>
-      log.error(s"Timeout after tyring ${tryCount.toString} times.")
-      from ! NoResponse
-      context.stop( self )
+      context.setReceiveTimeout(Duration.Undefined)
+      if(maxRetry > tryCount){
+        log.warning(s"No response from Malba, retrying ${tryCount.toString} times.")
+        context.system.scheduler.scheduleOnce(delayTime){
+          context.become(waitForResponse(from, request, tryCount + 1))
+          context.setReceiveTimeout(timeout)
+          router ! request
+        }
+        ()
+      } else {
+        log.error(s"Timeout after tyring ${tryCount.toString} times.")
+        from ! NoResponse
+        context.stop( self )
+      }
 
     case IntenalServerError(message) =>
-      log.error(s"Internal server error after tyring ${tryCount.toString} times. Message: ${message}")
-      context.become(waitForResponse(from, request, tryCount + 1))
-      router ! request
+      context.setReceiveTimeout(Duration.Undefined)
+      if(maxRetry > tryCount){
+        log.warning(s"Internal server error after tyring ${tryCount.toString} times. Message: ${message}")
+        context.system.scheduler.scheduleOnce(delayTime){
+          context.become(waitForResponse(from, request, tryCount + 1))
+          context.setReceiveTimeout(timeout)
+          router ! request
+        }
+        ()
+      } else {
+        log.error(s"Internal server error after tyring ${tryCount.toString} times. Message: ${message}")
+        from ! NoResponse
+        context.stop( self )
+      }
 
     case response =>
+      context.setReceiveTimeout(Duration.Undefined)
       from ! response
       context.stop( self )
   }

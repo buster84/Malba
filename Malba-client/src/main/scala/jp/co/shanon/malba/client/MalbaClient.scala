@@ -94,4 +94,20 @@ class MalbaClient(system: ActorSystem, from: String, timeout: FiniteDuration, ma
         status
     }
   }
+
+  def putTaskTypeSetting( taskType: String, maxNrOfWorkers: Int, config: Map[ String, String ], queueType: String ): Future[ MalbaProtocol.Status ] = {
+    val putTaskTypeSettingRequest = MalbaProtocol.PutTaskTypeSettingRequest(
+      taskType = taskType,
+      maxNrOfWorkers = maxNrOfWorkers,
+      config = config,
+      queueType = queueType,
+      from = from
+    )
+    ( system.actorOf( Props( classOf[ MalbaRequestHandler ], router, timeout, maxRetry ) ) ask putTaskTypeSettingRequest ).map {
+      case NoResponse =>
+        throw new Exception( "Can't get response" )
+      case MalbaProtocol.PutTaskTypeSettingResponse( from, taskType, status ) =>
+        status
+    }
+  }
 }

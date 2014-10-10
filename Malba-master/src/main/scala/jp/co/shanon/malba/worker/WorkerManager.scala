@@ -13,6 +13,8 @@ import akka.cluster.Cluster
 import akka.persistence.PersistentActor
 import akka.persistence.AtLeastOnceDelivery
 import akka.persistence.RecoveryCompleted
+import akka.persistence.RecoveryFailure
+import akka.persistence.PersistenceFailure
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -46,6 +48,9 @@ class WorkerManager(id: String, master: ActorRef) extends PersistentActor with A
         case ( taskType, actorPathList ) =>
           actorPathList.foreach { actorPath => addWorker( actorPath, taskType ) }
       }
+    case RecoveryFailure(cause) =>
+      log.error(cause, s"Failed to recover (persisten id = [${persistenceId}])")
+      throw new Exception(s"Failed to recover (persisten id = [${persistenceId}])")
   }
 
   def addWorker(actorPath: String, taskType:String): Unit = {
@@ -124,5 +129,10 @@ class WorkerManager(id: String, master: ActorRef) extends PersistentActor with A
             case _ => () // Nothing to do
           }
       }
+    case PersistenceFailure(payload, sequenceNumber, cause) =>
+      val errorMsg = "Failed to store data into journal" +
+        s"(persistent id = [${persistenceId}], sequence nr = [${sequenceNumber}], payload class = [${payload.getClass.getName}]). " + cause
+      log.error(cause, errorMsg)
+      throw new Exception(errorMsg)
   }
 }

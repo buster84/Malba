@@ -22,11 +22,16 @@ import akka.testkit.TestProbe
 import com.typesafe.config.ConfigFactory
 import java.io.File
 import org.apache.commons.io.FileUtils
+import org.joda.time.DateTime
 
 object MasterSpec {
 
   val clusterConfig = ConfigFactory.parseString("""
     akka.actor.provider = "akka.cluster.ClusterActorRefProvider"
+    akka.actor.serializers.delay-queue-state = "jp.co.shanon.malba.worker.DelayQueueManagerStateSerializer"
+    akka.actor.serialization-bindings = {
+      "jp.co.shanon.malba.worker.DelayQueueManagerState" = delay-queue-state
+    }
     akka.remote.netty.tcp.port=0
     akka.remote.netty.tcp.hostname=localhost
     akka.cluster {
@@ -84,51 +89,56 @@ class MasterSpec(var _system: ActorSystem)
   val testProbe = TestProbe()
 
 
-  val taskExecuterSystem: ActorSystem = ActorSystem("TaskExecuterSpec",MasterSpec.taskExecuterConfig)
 
-  val backendSystem: ActorSystem = {
-    val config = ConfigFactory.parseString("""akka.remote.netty.tcp.port=2555
-                                              akka.cluster.roles=[backend]""").withFallback(MasterSpec.clusterConfig)
-    ActorSystem("MasterSpec", config)
-  }
-  val backendSystem2: ActorSystem = {
-    val config = ConfigFactory.parseString("""akka.remote.netty.tcp.port=2556
-                                              akka.cluster.roles=[backend]""").withFallback(MasterSpec.clusterConfig)
-    ActorSystem("MasterSpec", config)
+  def withSystems(testCode: (ActorSystem, ActorSystem, ActorSystem) => Any) {
+    val taskExecuterSystem: ActorSystem = ActorSystem("TaskExecuterSpec",MasterSpec.taskExecuterConfig)
+
+    val backendSystem: ActorSystem = {
+      val config = ConfigFactory.parseString("""akka.remote.netty.tcp.port=2555
+                                                akka.cluster.roles=[backend]""").withFallback(MasterSpec.clusterConfig)
+      ActorSystem("MasterSpec", config)
+    }
+    val backendSystem2: ActorSystem = {
+      val config = ConfigFactory.parseString("""akka.remote.netty.tcp.port=2556
+                                                akka.cluster.roles=[backend]""").withFallback(MasterSpec.clusterConfig)
+      ActorSystem("MasterSpec", config)
+    }
+    try {
+      storageLocations.foreach(dir => FileUtils.deleteDirectory(dir))
+      testCode(taskExecuterSystem, backendSystem, backendSystem2) 
+      ()
+    } finally {
+      if( !backendSystem.isTerminated  ) {
+        backendSystem.shutdown()
+        backendSystem.awaitTermination()
+      }
+      if( !backendSystem2.isTerminated  ) {
+        backendSystem2.shutdown()
+        backendSystem2.awaitTermination()
+      }
+      if( !taskExecuterSystem.isTerminated ) {
+        taskExecuterSystem.shutdown()
+        taskExecuterSystem.awaitTermination()
+      }
+      storageLocations.foreach(dir => FileUtils.deleteDirectory(dir))
+    }
   }
 
   val storageLocations = List(
     "akka.persistence.journal.leveldb.dir",
     "akka.persistence.snapshot-store.local.dir").map(s => new File(system.settings.config.getString(s)))
 
-
-  override def beforeAll: Unit = {
-    storageLocations.foreach(dir => FileUtils.deleteDirectory(dir))
-  }
-
   override def afterAll: Unit = {
     system.shutdown()
-    if( ! backendSystem.isTerminated  ) {
-      backendSystem.shutdown()
-      backendSystem.awaitTermination()
-    }
-    if( ! backendSystem2.isTerminated  ) {
-      backendSystem2.shutdown()
-      backendSystem2.awaitTermination()
-    }
-
-    taskExecuterSystem.shutdown()
     system.awaitTermination()
-    taskExecuterSystem.awaitTermination()
-
     storageLocations.foreach(dir => FileUtils.deleteDirectory(dir))
   }
 
-  "Master" should "work as queuing server" in {
+  "Master" should "work as queuing server" in withSystems { ( taskExecuterSystem, backendSystem, backendSystem2 ) =>
 
-    val singletonManager1 = backendSystem.actorOf(ClusterSingletonManager.props(Props( classOf[Master], "workerManager1", Duration(100, MILLISECONDS) ), "active",
+    val singletonManager1 = backendSystem.actorOf(ClusterSingletonManager.props(Props( classOf[Master], "workerManager1", Duration(100, MILLISECONDS), Duration(5000, MILLISECONDS) ), "active",
       PoisonPill, Some("backend"), 5, 4), "master")
-    val singletonManager2 = backendSystem2.actorOf(ClusterSingletonManager.props(Props( classOf[Master], "workerManager1", Duration(100, MILLISECONDS) ), "active",
+    val singletonManager2 = backendSystem2.actorOf(ClusterSingletonManager.props(Props( classOf[Master], "workerManager1", Duration(100, MILLISECONDS), Duration(5000, MILLISECONDS) ), "active",
       PoisonPill, Some("backend"), 5, 4), "master")
 
     val frontend = system.actorOf(Props[Frontend], "frontend")
@@ -233,6 +243,124 @@ class MasterSpec(var _system: ActorSystem)
         expectMsg(MalbaProtocol.GetTaskResponse ( "id25", "from1", "taskType1", MalbaProtocol.Ok, Task( "id22", "taskType1", "contents22" )))
         frontend ! MalbaProtocol.GetTaskRequest ( "id26", "from1", "taskType1")
         expectMsg(MalbaProtocol.GetNoTaskResponse ( "id26", "from1", "taskType1"))
+      }
+    }
+
+  }
+
+  "Master" should "work as delay queuing server" in withSystems { ( taskExecuterSystem, backendSystem, backendSystem2 ) =>
+
+    val singletonManager1 = backendSystem.actorOf(ClusterSingletonManager.props(Props( classOf[Master], "workerManager1", Duration(100, MILLISECONDS), Duration(5000, MILLISECONDS) ), "active",
+      PoisonPill, Some("backend"), 5, 4), "master")
+    val singletonManager2 = backendSystem2.actorOf(ClusterSingletonManager.props(Props( classOf[Master], "workerManager1", Duration(100, MILLISECONDS), Duration(5000, MILLISECONDS) ), "active",
+      PoisonPill, Some("backend"), 5, 4), "master")
+
+    val frontend = system.actorOf(Props[Frontend], "frontend1")
+
+    val taskExecuter  = taskExecuterSystem.actorOf(Props(classOf[MasterSpec.WorkExecutor], testProbe.ref), "taskExecuter1")
+    val actorPath     = MasterSpec.actorPath + "1"
+
+    // Add delay task
+    within(20.seconds) {
+      awaitAssert {
+        frontend ! MalbaProtocol.AddDelayTaskRequest( id = "id1", taskId = "id1", from = "from1", group = None, 
+          option = Map.empty[String, String], taskType = "taskType1", task = "task1", scheduledTime = DateTime.now.plusSeconds(10) )
+        expectMsg(MalbaProtocol.AddTaskResponse ( "id1", "from1", "id1", None, "taskType1", MalbaProtocol.Ok, 0L, 0L, 0L))
+        frontend ! MalbaProtocol.AddDelayTaskRequest( id = "id1", taskId = "id1", from = "from1", group = None, 
+          option = Map.empty[String, String], taskType = "taskType1", task = "task1", scheduledTime = DateTime.now.plusSeconds(11) )
+        expectMsg(MalbaProtocol.AddTaskResponse ( "id1", "from1", "id1",None, "taskType1", MalbaProtocol.Ok, 0L, 0L, 0L))
+
+        frontend ! MalbaProtocol.AddDelayTaskRequest( id = "id2", taskId = "id2", from = "from1", group = None, 
+          option = Map.empty[String, String], taskType = "taskType1", task = "task2", scheduledTime = DateTime.now.plusSeconds(12) )
+        expectMsg(MalbaProtocol.AddTaskResponse ( "id2", "from1", "id2",None, "taskType1", MalbaProtocol.Ok, 0L, 0L, 0L))
+
+        frontend ! MalbaProtocol.AddDelayTaskRequest( id = "id3", taskId = "id3", from = "from1", group = None, 
+          option = Map.empty[String, String], taskType = "taskType1", task = "task3", scheduledTime = DateTime.now.plusSeconds(13) )
+        expectMsg(MalbaProtocol.AddTaskResponse ( "id3", "from1", "id3",None, "taskType1", MalbaProtocol.Ok, 0L, 0L, 0L))
+      }
+    }
+
+    // Get task
+    frontend ! MalbaProtocol.GetTaskRequest( "id4", "from1", "taskType1")
+    expectMsg(MalbaProtocol.GetNoTaskResponse( "id4", "from1", "taskType1"))
+
+    Thread.sleep(20000)
+    frontend ! MalbaProtocol.GetTaskRequest( "id5", "from1", "taskType1")
+    expectMsg(MalbaProtocol.GetTaskResponse( "id5", "from1", "taskType1", MalbaProtocol.Ok, Task( "id1", "taskType1", "task1" )))
+    frontend ! MalbaProtocol.GetTaskRequest( "id6", "from1", "taskType1")
+    expectMsg(MalbaProtocol.GetTaskResponse( "id6", "from1", "taskType1", MalbaProtocol.Ok, Task( "id2", "taskType1", "task2" )))
+    frontend ! MalbaProtocol.GetTaskRequest( "id7", "from1", "taskType1")
+    expectMsg(MalbaProtocol.GetTaskResponse( "id7", "from1", "taskType1", MalbaProtocol.Ok, Task( "id3", "taskType1", "task3" )))
+
+
+    // Cancel by id
+    frontend ! MalbaProtocol.AddDelayTaskRequest( id = "id8", taskId = "id8", from = "from1", group = None, 
+      option = Map.empty[String, String], taskType = "taskType1", task = "task8", scheduledTime = DateTime.now.plusSeconds(10) )
+    expectMsg(MalbaProtocol.AddTaskResponse ( "id8", "from1", "id8", None, "taskType1", MalbaProtocol.Ok, 0L, 0L, 0L))
+    frontend ! MalbaProtocol.AddDelayTaskRequest( id = "id9", taskId = "id9", from = "from1", group = None, 
+      option = Map.empty[String, String], taskType = "taskType1", task = "task9", scheduledTime = DateTime.now.plusSeconds(12) )
+    expectMsg(MalbaProtocol.AddTaskResponse ( "id9", "from1", "id9",None, "taskType1", MalbaProtocol.Ok, 0L, 0L, 0L))
+    frontend ! MalbaProtocol.AddDelayTaskRequest( id = "id10", taskId = "id10", from = "from1", group = None, 
+      option = Map.empty[String, String], taskType = "taskType1", task = "task10", scheduledTime = DateTime.now.plusSeconds(13) )
+    expectMsg(MalbaProtocol.AddTaskResponse ( "id10", "from1", "id10",None, "taskType1", MalbaProtocol.Ok, 0L, 0L, 0L))
+
+    frontend ! MalbaProtocol.CancelDelayTaskByIdRequest( "id11", "from1", "taskType1", "id9" )
+    expectMsg(MalbaProtocol.CancelTaskByIdResponse ( "id11", "from1", "taskType1", "id9", MalbaProtocol.Ok ))
+
+    Thread.sleep(20000)
+    frontend ! MalbaProtocol.GetTaskRequest( "id12", "from1", "taskType1")
+    expectMsg(MalbaProtocol.GetTaskResponse( "id12", "from1", "taskType1", MalbaProtocol.Ok, Task( "id8", "taskType1", "task8" )))
+    frontend ! MalbaProtocol.GetTaskRequest( "id13", "from1", "taskType1")
+    expectMsg(MalbaProtocol.GetTaskResponse( "id13", "from1", "taskType1", MalbaProtocol.Ok, Task( "id10", "taskType1", "task10" )))
+
+    frontend ! MalbaProtocol.GetTaskRequest( "id14", "from1", "taskType1")
+    expectMsg(MalbaProtocol.GetNoTaskResponse( "id14", "from1", "taskType1"))
+
+    // Cancel by group
+    frontend ! MalbaProtocol.AddDelayTaskRequest( id = "id15", taskId = "id15", from = "from1", group = Some( "group" ), 
+      option = Map.empty[String, String], taskType = "taskType1", task = "task15", scheduledTime = DateTime.now.plusSeconds(10) )
+    expectMsg(MalbaProtocol.AddTaskResponse ( "id15", "from1", "id15", Some( "group" ), "taskType1", MalbaProtocol.Ok, 0L, 0L, 0L))
+    frontend ! MalbaProtocol.AddDelayTaskRequest( id = "id16", taskId = "id16", from = "from1", group = Some( "group" ), 
+      option = Map.empty[String, String], taskType = "taskType1", task = "task16", scheduledTime = DateTime.now.plusSeconds(12) )
+    expectMsg(MalbaProtocol.AddTaskResponse ( "id16", "from1", "id16", Some( "group" ), "taskType1", MalbaProtocol.Ok, 0L, 0L, 0L))
+    frontend ! MalbaProtocol.AddDelayTaskRequest( id = "id17", taskId = "id17", from = "from1", group = None, 
+      option = Map.empty[String, String], taskType = "taskType1", task = "task17", scheduledTime = DateTime.now.plusSeconds(13) )
+    expectMsg(MalbaProtocol.AddTaskResponse ( "id17", "from1", "id17",None, "taskType1", MalbaProtocol.Ok, 0L, 0L, 0L))
+
+    frontend ! MalbaProtocol.CancelDelayTaskByGroupRequest( "id18", "from1", "taskType1", "group" )
+    expectMsg(MalbaProtocol.CancelTaskByGroupResponse( "id18", "from1", "taskType1", "group", MalbaProtocol.Ok ))
+
+    Thread.sleep(20000)
+    frontend ! MalbaProtocol.GetTaskRequest( "id19", "from1", "taskType1")
+    expectMsg(MalbaProtocol.GetTaskResponse( "id19", "from1", "taskType1", MalbaProtocol.Ok, Task( "id17", "taskType1", "task17" )))
+
+    frontend ! MalbaProtocol.GetTaskRequest( "id20", "from1", "taskType1")
+    expectMsg(MalbaProtocol.GetNoTaskResponse( "id20", "from1", "taskType1"))
+
+
+    // Check persistence
+    frontend ! MalbaProtocol.AddDelayTaskRequest( id = "id21", taskId = "id21", from = "from1", group = None, 
+      option = Map.empty[String, String], taskType = "taskType1", task = "task21", scheduledTime = DateTime.now.plusSeconds(10) )
+    expectMsg(MalbaProtocol.AddTaskResponse ( "id21", "from1", "id21", None, "taskType1", MalbaProtocol.Ok, 0L, 0L, 0L))
+    frontend ! MalbaProtocol.AddDelayTaskRequest( id = "id22", taskId = "id22", from = "from1", group = None, 
+      option = Map.empty[String, String], taskType = "taskType1", task = "task22", scheduledTime = DateTime.now.plusSeconds(12) )
+    expectMsg(MalbaProtocol.AddTaskResponse ( "id22", "from1", "id22",None, "taskType1", MalbaProtocol.Ok, 0L, 0L, 0L))
+    frontend ! MalbaProtocol.AddDelayTaskRequest( id = "id23", taskId = "id23", from = "from1", group = None, 
+      option = Map.empty[String, String], taskType = "taskType1", task = "task23", scheduledTime = DateTime.now.plusSeconds(13) )
+    expectMsg(MalbaProtocol.AddTaskResponse ( "id23", "from1", "id23",None, "taskType1", MalbaProtocol.Ok, 0L, 0L, 0L))
+    Thread.sleep(1000)
+
+    backendSystem.shutdown()
+
+    Thread.sleep(20000)
+    within(20.seconds) {
+      awaitAssert {
+        frontend ! MalbaProtocol.GetTaskRequest( "id24", "from1", "taskType1")
+        expectMsg(MalbaProtocol.GetTaskResponse( "id24", "from1", "taskType1", MalbaProtocol.Ok, Task( "id21", "taskType1", "task21" )))
+        frontend ! MalbaProtocol.GetTaskRequest( "id25", "from1", "taskType1")
+        expectMsg(MalbaProtocol.GetTaskResponse( "id25", "from1", "taskType1", MalbaProtocol.Ok, Task( "id22", "taskType1", "task22" )))
+        frontend ! MalbaProtocol.GetTaskRequest( "id26", "from1", "taskType1")
+        expectMsg(MalbaProtocol.GetTaskResponse( "id26", "from1", "taskType1", MalbaProtocol.Ok, Task( "id23", "taskType1", "task23" )))
       }
     }
 

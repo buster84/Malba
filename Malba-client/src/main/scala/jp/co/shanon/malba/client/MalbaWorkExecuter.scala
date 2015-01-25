@@ -174,7 +174,7 @@ class MalbaWorkManager(
       self ! TaskIsReady
 
     case MalbaWorkProtocol.WorkFail =>
-      log.error("Failed task. taskType=${taskType}.")
+      log.error(s"Failed task. taskType=${taskType}.")
       context.unwatch(worker)
 
       if(maxRetryCount > tryCount) {

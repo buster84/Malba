@@ -15,6 +15,10 @@ class BalancingQueue( config: Map[String, String] = Map.empty[String, String] ) 
     }
   }
 
+  def isEnqueueable( task: Task, group: Option[String], option: Map[String, String] ): Boolean = {
+    ! contains( task.id )
+  }
+
   def enqueue( task: Task, group: Option[String], option: Map[String, String] ): Unit = {
     val insertingGroup = group.getOrElse( "OTHERS" )
     if(storage.exists{ case (g, _) => g == insertingGroup }){

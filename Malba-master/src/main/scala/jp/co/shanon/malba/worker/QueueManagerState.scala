@@ -2,26 +2,29 @@ package jp.co.shanon.malba.worker
 import jp.co.shanon.malba.queue.CustomQueue
 import scala.collection.immutable.HashMap
 import jp.co.shanon.malba.queue.FIFOQueue
+import org.joda.time.DateTime
+import scala.collection.mutable.PriorityQueue
+import scala.math.Ordering
 
-object MasterState {
-  def empty: MasterState = MasterState(HashMap.empty[String,(String,Map[String, String])], HashMap.empty[String, CustomQueue])
+object QueueManagerState {
+  def empty: QueueManagerState = QueueManagerState(HashMap.empty[String,(String,Map[String, String])], HashMap.empty[String, CustomQueue])
 
-  trait MasterDomainEvent
-  case class TaskAdded(id: String, from: String, taskId: String, group: Option[String], option: Map[String, String], taskType: String, task: String) extends MasterDomainEvent
-  case class TaskCanceledById(id: String, from: String, taskType: String, taskId: String) extends MasterDomainEvent
-  case class TaskCanceledByGroup(id: String, from: String, taskType: String, group: String) extends MasterDomainEvent
-  case class TaskSent(id: String, from: String, taskType: String) extends MasterDomainEvent
-  case class TaskTypeSettingAdded(from: String, taskType: String, queueType: String, maxNrOfWorkers: Int, config: Map[String, String]) extends MasterDomainEvent
+  trait QueueManagerDomainEvent
+  case class TaskAdded(id: String, from: String, taskId: String, group: Option[String], option: Map[String, String], taskType: String, task: String) extends QueueManagerDomainEvent
+  case class TaskCanceledById(id: String, from: String, taskType: String, taskId: String) extends QueueManagerDomainEvent
+  case class TaskCanceledByGroup(id: String, from: String, taskType: String, group: String) extends QueueManagerDomainEvent
+  case class TaskSent(id: String, from: String, taskType: String) extends QueueManagerDomainEvent
+  case class TaskTypeSettingAdded(from: String, taskType: String, queueType: String, maxNrOfWorkers: Int, config: Map[String, String]) extends QueueManagerDomainEvent
 }
 
 
-case class MasterState(
+case class QueueManagerState(
   taskTypeSetting: HashMap[String, ( String, Map[String, String] )],
   tasks: HashMap[String, CustomQueue]
 ) {
-  import MasterState._
+  import QueueManagerState._
 
-  def setTaskTypeSetting( taskType: String, queueType: String, maxNrOfWorkers: Int, config: Map[String, String] ): MasterState = {
+  def setTaskTypeSetting( taskType: String, queueType: String, maxNrOfWorkers: Int, config: Map[String, String] ): QueueManagerState = {
     copy(taskTypeSetting = taskTypeSetting + ( taskType -> Tuple2(queueType, config) ))
   }
 
@@ -44,7 +47,13 @@ case class MasterState(
     nonEmpty(taskType) && tasks.apply(taskType).contains(taskId)
   }
 
-  def enqueue( taskId: String, taskType: String, content: String, group: Option[String], option: Map[String, String] ): MasterState = {
+  def isEnqueueable( taskId: String, taskType: String, content: String, group: Option[String], option: Map[String, String] ): Boolean = {
+    val task = Task( taskId, taskType, content )
+    // Because default Queue is FIFOQueue and empty FIFOQueue can enqueue any tasks, if given taskType is empty, any task can be enqueued
+    !nonEmpty( taskType ) || tasks.apply(taskType).isEnqueueable( task, group, option )
+  }
+
+  def enqueue( taskId: String, taskType: String, content: String, group: Option[String], option: Map[String, String] ): QueueManagerState = {
     val task = Task( taskId, taskType, content )
     if( nonEmpty( taskType ) ){
       tasks.apply(taskType).enqueue( task, group, option )
@@ -57,7 +66,7 @@ case class MasterState(
     }
   }
 
-  def dequeue(taskType: String): (Option[Task], MasterState) = {
+  def dequeue(taskType: String): (Option[Task], QueueManagerState) = {
     val taskList = tasks.getOrElse(taskType, getInitialQueue( taskType ))
     if(taskList.isEmpty){
       (None, this)
@@ -71,7 +80,7 @@ case class MasterState(
     }
   }
 
-  def deleteById( taskType: String, id: String ): MasterState = {
+  def deleteById( taskType: String, id: String ): QueueManagerState = {
     val taskList = tasks.getOrElse(taskType, getInitialQueue( taskType ))
     taskList.deleteById( id )
     if( taskList.isEmpty ){
@@ -81,7 +90,7 @@ case class MasterState(
     }
   }
 
-  def deleteByGroup( taskType: String, group: String ): MasterState = {
+  def deleteByGroup( taskType: String, group: String ): QueueManagerState = {
     val taskList = tasks.getOrElse(taskType, getInitialQueue( taskType ))
     taskList.deleteByGroup( group )
     if( taskList.isEmpty ){
@@ -91,7 +100,8 @@ case class MasterState(
     }
   }
 
-  def updated(event: MasterDomainEvent): MasterState = {
+
+  def updated(event: QueueManagerDomainEvent): QueueManagerState = {
     event match {
       case TaskAdded(id, from, taskId, group, option, taskType, task) => 
         enqueue( taskId, taskType, task, group, option)

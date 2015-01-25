@@ -13,9 +13,6 @@ object MalbaBuild extends Build {
   val USERNAME   = appName.toLowerCase()
 
   val resolversList         = Seq( "local dotM2" at "file://"+Path.userHome.absolutePath+"/.m2/repository" )
-  val externalResolversList = Seq( "local dotM2" at "file://"+Path.userHome.absolutePath+"/.m2/repository",
-                               "shanon artifactory repo" at Credential.repo + "/repo" )
-  // val enableSNIExtension = Option(System.getProperty("jsse.enableSNIExtension")).getOrElse("true")
 
   val options = Seq( 
     "-encoding", "UTF-8",
@@ -32,8 +29,7 @@ object MalbaBuild extends Build {
     version                   := appVersion,
     scalacOptions in Compile  := options,
     scalaVersion              := Dependencies.Versions.scalaVer,
-    resolvers                 := resolversList,
-    externalResolvers         := externalResolversList,
+    resolvers                 ++= resolversList,
     parallelExecution in Test := false
   )
 

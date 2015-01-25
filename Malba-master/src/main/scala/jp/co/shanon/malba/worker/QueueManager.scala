@@ -19,6 +19,7 @@ import akka.persistence.SaveSnapshotSuccess
 import akka.persistence.SnapshotOffer
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
+import scala.annotation.tailrec
 
 object QueueManager {
 
@@ -51,53 +52,53 @@ class QueueManager(snapshotInterval: FiniteDuration) extends PersistentActor wit
   }
 
 
-  // persistenceId must include cluster role to support multiple masters
+  // persistenceId must include cluster role to support multiple queueManager 
   override def persistenceId: String = Cluster(context.system).selfRoles.find(_.startsWith("backend-")) match {
-    case Some(role) => role + "-master"
-    case None       => "master"
+    case Some(role) => role + "-queueManager"
+    case None       => "queueManager"
   }
 
   override def receiveRecover = {
-    case event: MasterState.TaskAdded => 
+    case event: QueueManagerState.TaskAdded => 
       addTask(event)
-    case event: MasterState.TaskSent =>
+    case event: QueueManagerState.TaskSent =>
       getTask(event)
       ()
-    case event: MasterState.TaskCanceledByGroup => 
+    case event: QueueManagerState.TaskCanceledByGroup => 
       cancelTaskByGroup(event)
-    case event: MasterState.TaskCanceledById => 
+    case event: QueueManagerState.TaskCanceledById => 
       cancelTaskById(event)
-    case SnapshotOffer(metadata, state: MasterState) =>
+    case SnapshotOffer(metadata, state: QueueManagerState) =>
       log.info(s"Recover from snapshot (metadata = ${metadata.toString})")
-      masterState = state
+      queueManagerState = state
     case RecoveryFailure(cause) =>
       log.error(cause, s"Failed to recover (persisten id = [${persistenceId}])")
       throw new Exception(s"Failed to recover (persisten id = [${persistenceId}])")
   }
 
 
-  var masterState: MasterState = MasterState.empty
+  var queueManagerState: QueueManagerState = QueueManagerState.empty
 
-  def addTask(event: MasterState.TaskAdded) = {
-    masterState = masterState.updated(event)
+  def addTask(event: QueueManagerState.TaskAdded) = {
+    queueManagerState = queueManagerState.updated(event)
   }
-  def cancelTaskById(event: MasterState.TaskCanceledById) = {
-    masterState = masterState.updated(event)
+  def cancelTaskById(event: QueueManagerState.TaskCanceledById) = {
+    queueManagerState = queueManagerState.updated(event)
   }
-  def cancelTaskByGroup(event: MasterState.TaskCanceledByGroup) = {
-    masterState = masterState.updated(event)
+  def cancelTaskByGroup(event: QueueManagerState.TaskCanceledByGroup) = {
+    queueManagerState = queueManagerState.updated(event)
   }
-  def getTask(event: MasterState.TaskSent): Option[Task] = {
-    if(masterState.nonEmpty(event.taskType)){
-      val ( task, state ) = masterState.dequeue(event.taskType)
-      masterState = state
+  def getTask(event: QueueManagerState.TaskSent): Option[Task] = {
+    if(queueManagerState.nonEmpty(event.taskType)){
+      val ( task, state ) = queueManagerState.dequeue(event.taskType)
+      queueManagerState = state
       task
     } else {
       None
     }
   }
-  def setTaskTypeSetting( event: MasterState.TaskTypeSettingAdded ) = {
-    masterState = masterState.updated(event)
+  def setTaskTypeSetting( event: QueueManagerState.TaskTypeSettingAdded ) = {
+    queueManagerState = queueManagerState.updated(event)
   }
 
   override def receiveCommand = {
@@ -106,12 +107,12 @@ class QueueManager(snapshotInterval: FiniteDuration) extends PersistentActor wit
         val response: MalbaProtocol.AddTaskResponse = commandIdForAddTask.apply( id )._1
         sender() ! response
       } else {
-        if(masterState.contains(taskType, taskId)){
-          val response = MalbaProtocol.AddTaskResponse(id, taskId, from, group, taskType, MalbaProtocol.Reject("409", "Duplicate task id"), 0L, 0L, 0L)
+        if(!queueManagerState.isEnqueueable(taskId, taskType, task, group, option)){
+          val response = MalbaProtocol.AddTaskResponse(id, taskId, from, group, taskType, MalbaProtocol.Reject("400", "Invalid request"), 0L, 0L, 0L)
           commandIdForAddTask = commandIdForAddTask + (id -> Tuple2(response, getDeadline))
           sender() ! response
         } else {
-          val event    = MasterState.TaskAdded(id, from, taskId, group, option, taskType, task)
+          val event    = QueueManagerState.TaskAdded(id, from, taskId, group, option, taskType, task)
           val response = MalbaProtocol.AddTaskResponse ( id, from, taskId,  group, taskType, MalbaProtocol.Ok, 0L, 0L, 0L ) // TODO: Implement seq number
           commandIdForAddTask = commandIdForAddTask + (id -> Tuple2(response, getDeadline))
           persist(event) { evt =>
@@ -127,8 +128,8 @@ class QueueManager(snapshotInterval: FiniteDuration) extends PersistentActor wit
         val response: MalbaProtocol.AddTaskResponse = commandIdForAddTask.apply( id )._1
         sender() ! response
       } else {
-        if(masterState.contains(taskType, taskId)){
-          val response = MalbaProtocol.AddTaskResponse(id, taskId, from, group, taskType, MalbaProtocol.Reject("409", "Duplicate task id"), 0L, 0L, 0L)
+        if(!queueManagerState.isEnqueueable(taskId, taskType, task, group, option)){
+          val response = MalbaProtocol.AddTaskResponse(id, taskId, from, group, taskType, MalbaProtocol.Reject("400", "Invalid request"), 0L, 0L, 0L)
           commandIdForAddTask = commandIdForAddTask + (id -> Tuple2(response, getDeadline))
           sender() ! response
         } else {
@@ -157,7 +158,7 @@ class QueueManager(snapshotInterval: FiniteDuration) extends PersistentActor wit
         val response: MalbaProtocol.GetTaskResponseBase = commandIdForGetTask.apply( id )._1
         sender() ! response
       } else {
-        val event = MasterState.TaskSent( id, from, taskType )
+        val event = QueueManagerState.TaskSent( id, from, taskType )
         // Don't use psersistAsync because this message should be deal with synchronously.
         persist(event) { evt =>
           val taskOpt  = getTask( evt )
@@ -177,12 +178,12 @@ class QueueManager(snapshotInterval: FiniteDuration) extends PersistentActor wit
         val response: MalbaProtocol.CancelTaskResponse = commandIdForCancelTask.apply( id )._1
         sender() ! response
       } else {
-        if(!masterState.contains(taskType, taskId)){
+        if(!queueManagerState.contains(taskType, taskId)){
           val response = MalbaProtocol.CancelTaskByIdResponse(id, from, taskType, taskId, MalbaProtocol.Reject("404", "Not found task id"))
           commandIdForCancelTask = commandIdForCancelTask + (id -> Tuple2(response, getDeadline))
           sender() ! response
         } else {
-          val event    = MasterState.TaskCanceledById(id, from, taskType, taskId)
+          val event    = QueueManagerState.TaskCanceledById(id, from, taskType, taskId)
           val response = MalbaProtocol.CancelTaskByIdResponse ( id, from, taskType, taskId, MalbaProtocol.Ok )
           commandIdForCancelTask = commandIdForCancelTask + (id -> Tuple2(response, getDeadline))
           persist(event) { evt =>
@@ -197,7 +198,7 @@ class QueueManager(snapshotInterval: FiniteDuration) extends PersistentActor wit
         val response: MalbaProtocol.CancelTaskResponse = commandIdForCancelTask.apply( id )._1
         sender() ! response
       } else {
-        val event    = MasterState.TaskCanceledByGroup(id, from, taskType, group)
+        val event    = QueueManagerState.TaskCanceledByGroup(id, from, taskType, group)
         val response = MalbaProtocol.CancelTaskByGroupResponse ( id, from, taskType, group, MalbaProtocol.Ok )
         commandIdForCancelTask = commandIdForCancelTask + (id -> Tuple2(response, getDeadline))
         persist(event) { evt =>
@@ -207,7 +208,7 @@ class QueueManager(snapshotInterval: FiniteDuration) extends PersistentActor wit
       }
 
     case MalbaProtocol.PutTaskTypeSettingRequest ( taskType, maxNrOfWorkers, config, queueType, from ) =>
-      val event = MasterState.TaskTypeSettingAdded(from, taskType, queueType, maxNrOfWorkers, config)
+      val event = QueueManagerState.TaskTypeSettingAdded(from, taskType, queueType, maxNrOfWorkers, config)
       persist(event) { evt =>
         setTaskTypeSetting( evt )
         sender() ! MalbaProtocol.PutTaskTypeSettingResponse ( evt.from, evt.taskType, MalbaProtocol.Ok )
@@ -225,7 +226,7 @@ class QueueManager(snapshotInterval: FiniteDuration) extends PersistentActor wit
       }
 
     case TakeSnapshotTick =>
-      saveSnapshot(masterState)
+      saveSnapshot(queueManagerState)
 
     case SaveSnapshotSuccess(metadata) =>
       log.info(s"Succeed to take snapshot (persistent id = [${persistenceId}], metadata = [${metadata.toString}])")

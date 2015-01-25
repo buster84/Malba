@@ -6,6 +6,15 @@ object MalbaProtocol {
   //
   // Add tasks protocol
   //
+  trait AddTaskRequestBase {
+    val id: String
+    val taskId: String
+    val from: String
+    val group: Option[String]
+    val option: Map[String, String]
+    val taskType: String
+    val task: String
+  }
   case class AddTaskRequest (
     id: String,
     taskId: String,
@@ -14,7 +23,7 @@ object MalbaProtocol {
     option: Map[String, String] = Map.empty[String, String],
     taskType: String,
     task: String
-  )
+  ) extends AddTaskRequestBase
 
   case class AddTaskWithCheckWorkState (
     id: String,
@@ -24,7 +33,30 @@ object MalbaProtocol {
     option: Map[String, String] = Map.empty[String, String],
     taskType: String,
     task: String
-  )
+  ) extends AddTaskRequestBase
+
+  case class AddDelayTaskRequest (
+    id: String,
+    taskId: String,
+    from: String,
+    group: Option[String],
+    option: Map[String, String] = Map.empty[String, String],
+    taskType: String,
+    task: String,
+    scheduledTime: DateTime
+  ) extends AddTaskRequestBase {
+    def toAddTaskRequest: AddTaskRequest = {
+      AddTaskRequest( 
+        id,
+        taskId,
+        from,
+        group,
+        option,
+        taskType,
+        task
+      )
+    }
+  }
 
   case class AddTaskResponse (
     id: String,
@@ -94,6 +126,19 @@ object MalbaProtocol {
     val taskType: String
   }
 
+  case class CancelDelayTaskByIdRequest (
+    id: String,
+    from: String,
+    taskType: String,
+    taskId: String
+  ) extends CancelTaskRequest
+
+  case class CancelDelayTaskByGroupRequest (
+    id: String,
+    from: String,
+    taskType: String,
+    group: String
+  ) extends CancelTaskRequest
   case class CancelTaskByIdRequest (
     id: String,
     from: String,

@@ -19,11 +19,11 @@ import scala.concurrent.duration._
 
 object Master {
 
-  def props(workManagerId: String, snapshotInterval: FiniteDuration): Props =
-    Props(classOf[Master], workManagerId, snapshotInterval)
+  def props(workManagerId: String, snapshotInterval: FiniteDuration, scheduleInterval:FiniteDuration = Duration( 5, SECONDS )): Props =
+    Props(classOf[Master], workManagerId, snapshotInterval, scheduleInterval)
 }
 
-class Master(workManagerId: String, snapshotInterval: FiniteDuration) extends Actor with ActorLogging {
+class Master(workManagerId: String, snapshotInterval: FiniteDuration, scheduleInterval:FiniteDuration) extends Actor with ActorLogging {
 
   override val supervisorStrategy = OneForOneStrategy(maxNrOfRetries = 10, withinTimeRange = Duration(1, MINUTES)) {
     case e: Throwable => 
@@ -34,8 +34,9 @@ class Master(workManagerId: String, snapshotInterval: FiniteDuration) extends Ac
       Stop
   }
 
-  val workerManager = context.actorOf(Props(classOf[WorkerManager], workManagerId, self), "workerManager")
-  val queueManager  = context.actorOf(QueueManager.props(snapshotInterval))
+  val workerManager     = context.actorOf(Props(classOf[WorkerManager], workManagerId, self), "workerManager")
+  val queueManager      = context.actorOf(QueueManager.props(snapshotInterval))
+  val delayQueueManager = context.actorOf(DelayQueueManager.props(scheduleInterval, snapshotInterval))
 
   def receive = {
     case message : MasterProtocol.Notify =>
@@ -46,6 +47,15 @@ class Master(workManagerId: String, snapshotInterval: FiniteDuration) extends Ac
 
     case message @ MalbaProtocol.GetWorkerStateRequest(_) =>
       workerManager forward message
+
+    case message : MalbaProtocol.AddDelayTaskRequest =>
+      delayQueueManager forward message
+
+    case message : MalbaProtocol.CancelDelayTaskByIdRequest =>
+      delayQueueManager forward message
+
+    case message : MalbaProtocol.CancelDelayTaskByGroupRequest =>
+      delayQueueManager forward message
 
     case message =>
       queueManager forward message

@@ -30,6 +30,10 @@ class FIFOQueue( config: Map[String, String] = Map.empty[String, String] ) exten
     taskCounter.contains(id)
   }
 
+  def isEnqueueable( task: Task, group: Option[String], option: Map[String, String] ): Boolean = {
+    ! contains( task.id )
+  }
+
   def isEmpty: Boolean = {
     storage.isEmpty
   }
